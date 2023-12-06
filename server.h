@@ -5,17 +5,20 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <netdb.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
 //"USERS/103074/103074_login.txt"
+//"USERS/103074/BIDDED"
 
 #define USERS_DIR "USERS/"
 #define AUCTIONS_DIR "AUCTIONS/"
 
-#define MAX_FILE_LENGH 30
+#define MAX_FILE_LENGTH 30
+#define USER_SUB_DIR_LENGTH 20
 #define USER_DIR_SIZE 13
 #define USER_UID_SIZE 7
 #define PASS_SIZE 9
@@ -25,12 +28,14 @@
 #define STATUS_NOK 1
 
 #define LOGIN_REG 2
+#define ALR_LOGIN 3
 #define UNREG_UNR 2
 #define LOGOUT_UNR 2
+#define RMA_NLG 2
 
 #define PORT "58011"
 
-#define MAX_MSG_LEN 128
+#define MAX_MSG_LEN 6002
 #define CODE_SIZE 4
 
 int udp_fd, tcp_fd, tcp_newfd, udp_errcode, tcp_errcode;
