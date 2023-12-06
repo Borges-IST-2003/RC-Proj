@@ -38,10 +38,9 @@
 #define MAX_MSG_LEN 6002
 #define CODE_SIZE 4
 
-int udp_fd, tcp_fd, tcp_newfd, udp_errcode, tcp_errcode;
-int stop = 0;
-ssize_t udp_n, tcp_n;
+int udp_fd, tcp_fd, tcp_newfd, udp_n, tcp_n, udp_errcode, tcp_errcode;
 socklen_t udp_addrlen, tcp_addrlen;
 struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
 char buffer[128];
+pid_t child_pid;
