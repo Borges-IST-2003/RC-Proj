@@ -48,25 +48,6 @@ int check_password(const char* password, const char* pass_filepath){
     return STATUS_OK;
 }
 
-// Checks if a directory is empty
-int is_dir_empty(const char *dirname) {
-    DIR *dir;
-    
-    if ((dir = opendir(dirname)) == NULL) {
-        perror("Error opening directory.\n");
-        return ERR;
-    }
-
-    struct dirent *entry = readdir(dir); // Read the first entry
-
-    closedir(dir);
-
-    if(entry == NULL)
-        return STATUS_OK;
-
-    return STATUS_NOK;
-}
-
 // Creates user's pass and login files & (if didn't previously exist) USER_UID, HOSTED, BIDDED dirs
 int user_create(const char *login_filepath, const char *pass_filepath, const char *user_uid, const char *password) { // Creates user
     FILE *file;
@@ -252,7 +233,7 @@ int user_logout(char *buffer) {
 int list_user_auctions(char *buffer, char *answer) {
     DIR *dir;
     struct dirent *entry;
-    int result;
+    int is_open = 0;                                    // nº of files in a dir
     char user_uid[USER_UID_SIZE] = {0};                 // user uid read from the socket
     char login_filepath[MAX_FILE_LENGTH] = {0};         // login file path
     char hosted_dir[USER_SUB_DIR_LENGTH] = {0};         // hosted directory
@@ -265,14 +246,6 @@ int list_user_auctions(char *buffer, char *answer) {
     if(access(login_filepath, F_OK) == -1)
         return RMA_NLG;
 
-    if((result = is_dir_empty(hosted_dir)) == STATUS_OK)
-        return STATUS_NOK;
-
-    else if (result == ERR)
-        return ERR;
-
-    strcat(answer, "RMA OK ");
-
     // Open the directory
     dir = opendir(hosted_dir);
     if (dir == NULL) {
@@ -283,11 +256,13 @@ int list_user_auctions(char *buffer, char *answer) {
     // Reset the directory stream
     rewinddir(dir);
 
+    strcat(answer, "RMA OK ");
     // Concatenate file names into the allocated memory
     while ((entry = readdir(dir)) != NULL){
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
+        is_open++;
         strncat(answer, entry->d_name, 3);
         strcat(answer, " ");
     }
@@ -296,6 +271,94 @@ int list_user_auctions(char *buffer, char *answer) {
 
     // Close the directory
     closedir(dir);
+
+    if (is_open == 0)       // If nº files == 0, dir is empty
+        return STATUS_NOK;
+
+    return STATUS_OK;
+}
+
+int list_user_bids(char *buffer, char *answer) {
+    DIR *dir;
+    struct dirent *entry;
+    int is_open= 0;                                     // nº of files in a dir
+    char user_uid[USER_UID_SIZE] = {0};                 // user uid read from the socket
+    char login_filepath[MAX_FILE_LENGTH] = {0};         // login file path
+    char bidded_dir[USER_SUB_DIR_LENGTH] = {0};         // bidded directory
+
+    sscanf(buffer + 3, "%s\n", user_uid);
+
+    sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid);
+    sprintf(bidded_dir, "%s%s/BIDDED", USERS_DIR, user_uid);
+
+    if(access(login_filepath, F_OK) == -1)
+        return RMB_NLG;
+
+    // Open the directory
+    dir = opendir(bidded_dir);
+    if (dir == NULL) {
+        perror("Error opening directory");
+        return ERR;
+    }
+
+    // Reset the directory stream
+    rewinddir(dir);
+
+    strcat(answer, "RMB OK ");
+    // Concatenate file names into the allocated memory
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        is_open++;
+        strncat(answer, entry->d_name, 3);
+        strcat(answer, " ");
+    }
+
+    // ! Missing states
+
+    // Close the directory
+    closedir(dir);
+
+    if (is_open == 0)       // If nº files == 0, dir is empty
+        return STATUS_NOK;
+
+    return STATUS_OK;
+}
+
+int list_auctions(char *answer) {
+    DIR *dir;
+    struct dirent *entry;
+    int is_open = 0;
+
+    // Open the directory
+    dir = opendir(AUCTIONS_DIR);
+    if (dir == NULL) {
+        perror("Error opening directory");
+        return ERR;
+    }
+
+    // Reset the directory stream
+    rewinddir(dir);
+
+    strcat(answer, "RLS OK ");
+    // Concatenate file names into the allocated memory
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        is_open++;
+        strncat(answer, entry->d_name, 3);
+        strcat(answer, " ");
+    }
+
+    // ! Missing states
+
+    // Close the directory
+    closedir(dir);
+
+    if (is_open == 0)       // If nº files == 0, dir is empty
+        return STATUS_NOK;
 
     return STATUS_OK;
 }
@@ -308,13 +371,13 @@ void udp_handler(){
     char message_code[CODE_SIZE] = {0};
     char answer[MAX_MSG_LEN] = {0};
     udp_addrlen = sizeof(udp_addr);
-    udp_n = recvfrom(udp_fd, buffer, 128, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+    udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
     if (udp_n == -1)
         exit(1);
 
     memcpy(message_code, buffer, 3);
-    write(1, "received: ", 10);
-    write(1, buffer, udp_n);
+    write(1, "received: ", 10);         // !
+    write(1, buffer, udp_n);            // !
     if(strcmp(message_code, "LIN") == 0){
         switch (user_login(buffer)){
             case STATUS_OK:
@@ -325,8 +388,8 @@ void udp_handler(){
                 strcpy(answer, "RLI NOK");
                 break;
             
-            case RMA_NLG:
-                strcpy(answer, "RMA NLG");
+            case LOGIN_REG:
+                strcpy(answer, "RLI REG");
                 break;
 
             default:
@@ -384,7 +447,7 @@ void udp_handler(){
                 strcpy(answer, "RMA NOK");
                 break;
             
-            case UNREG_UNR:
+            case RMA_NLG:
                 strcpy(answer, "RMA UNR");
                 break;
             
@@ -394,17 +457,50 @@ void udp_handler(){
         }
     }
 
+    else if(strcmp(message_code, "LMB") == 0){
+        switch (list_user_bids(buffer, answer)) {
+            case STATUS_OK:
+                break;
+            
+            case STATUS_NOK:
+                strcpy(answer, "RMB NOK");
+                break;
+            
+            case RMB_NLG:
+                strcpy(answer, "RMB UNR");
+                break;
+            
+            default:
+                strcpy(answer, "RMB ERR");
+                break;
+        }
+    }
+
+    else if(strcmp(message_code, "LST") == 0){
+        switch (list_auctions(answer)) {
+            case STATUS_OK:
+                break;
+            
+            case STATUS_NOK:
+                strcpy(answer, "RLS NOK");
+                break;
+            
+            default:
+                strcpy(answer, "RLS ERR");
+                break;
+        }
+    }
+
     udp_n = sendto(udp_fd, answer, strlen(answer), 0,(struct sockaddr *)&udp_addr, udp_addrlen);
         if (udp_n == -1) /*error*/
             exit(1);
     
-    close(udp_fd);
     return;
 }
 
 void tcp_handler(int tcp_newfd){
     
-    tcp_n = read(tcp_newfd, buffer, 128);
+    tcp_n = read(tcp_newfd, buffer, MAX_MSG_LEN);
     
     if(tcp_n == -1)
         exit(1);
@@ -456,17 +552,14 @@ int main() {
 
     if (listen(tcp_fd, 5) == -1)
         exit(1);
-    
+
     // Main Loop
-    while (1)
-    {   
+    while (1) {
         fd_set read_fds;
         FD_ZERO(&read_fds);
         FD_SET(tcp_fd, &read_fds);
         FD_SET(udp_fd, &read_fds);
-
         int max_fd = max(udp_fd, tcp_fd);
-
         if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1)
             exit(1);
 
@@ -483,17 +576,15 @@ int main() {
             if((child_pid = fork()) == -1)
                 exit(1);
 
-            if(child_pid == 0){
-                close(tcp_fd);
+            if(child_pid == 0)
                 tcp_handler(tcp_newfd);
-            }
-            else{
-                close(tcp_newfd);
-            }
         }
     }
 
     freeaddrinfo(udp_res);
+    close(udp_fd);
     freeaddrinfo(tcp_res);    
+    close(tcp_fd);
+
     return 0;
 }

@@ -13,8 +13,7 @@ int is_udp(char *code){
     return 0;
 }
 
-int udp_connect(char *message, int message_len)
-{
+int udp_connect(char *message, int message_len) {
     memset(buffer, 0, strlen(buffer));
     fd = socket(AF_INET, SOCK_DGRAM, 0); // UDP socket
     if (fd == -1)                        /*error*/
@@ -31,7 +30,7 @@ int udp_connect(char *message, int message_len)
     if (n == -1) /*error*/
         return -1;
     addrlen = sizeof(addr);
-    n = recvfrom(fd, buffer, 128, 0, (struct sockaddr *)&addr, &addrlen);
+    n = recvfrom(fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&addr, &addrlen);
     if (n == -1) /*error*/
         return -1;
 
@@ -46,8 +45,7 @@ int udp_connect(char *message, int message_len)
     return 0;
 }
 
-int tcp_connect(char *message, int message_len)
-{
+int tcp_connect(char *message, int message_len) {
     fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
     if (fd == -1)
         return -1; // error
@@ -79,8 +77,7 @@ int tcp_connect(char *message, int message_len)
     return 0;
 }
 
-int main()
-{
+int main() {
     char message_code[CODE_SIZE] = {0};
     char message_buffer[MAX_MSG_LEN] = {0};
 

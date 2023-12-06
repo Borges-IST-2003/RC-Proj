@@ -19,6 +19,7 @@
 
 #define MAX_FILE_LENGTH 30
 #define USER_SUB_DIR_LENGTH 20
+#define AUCTIONS_DIR_LENGTH 11
 #define USER_DIR_SIZE 13
 #define USER_UID_SIZE 7
 #define PASS_SIZE 9
@@ -32,6 +33,7 @@
 #define UNREG_UNR 2
 #define LOGOUT_UNR 2
 #define RMA_NLG 2
+#define RMB_NLG 2
 
 #define PORT "58011"
 
@@ -42,5 +44,5 @@ int udp_fd, tcp_fd, tcp_newfd, udp_n, tcp_n, udp_errcode, tcp_errcode;
 socklen_t udp_addrlen, tcp_addrlen;
 struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
-char buffer[128];
+char buffer[MAX_MSG_LEN];
 pid_t child_pid;

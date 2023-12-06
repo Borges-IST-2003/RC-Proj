@@ -12,7 +12,7 @@
 #define LOGIN_NOK "RLI NOK"
 #define LOGIN_ERR "RLI ERR"
 #define LOGOUT_OK "RLO OK"
-#define MAX_MSG_LEN 128
+#define MAX_MSG_LEN 6002
 #define CODE_SIZE 4
 
 int fd, errcode;
@@ -21,7 +21,7 @@ ssize_t n;
 socklen_t addrlen;
 struct addrinfo hints, *res;
 struct sockaddr_in addr;
-char buffer[128];
+char buffer[MAX_MSG_LEN];
 
 int is_udp(char *code);
 
