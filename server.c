@@ -1,98 +1,97 @@
 #include "server.h"
 
-int user_create(char *filepath, char *user_uid, char *password) { // Creates user
-    FILE *fp;
-    int registred = 0;
-    char user_dir[USER_DIR_SIZE] = {0};
-    memcpy(user_dir, filepath, USER_DIR_SIZE - 1);
+int create_login(char* user_uid, char* login_filepath){
+    FILE *file;
 
-    if (mkdir(user_dir, 0777) != 0) {
-        // Check if the directory already exists
-        if (errno != EEXIST) {
-            perror("Error creating user directory");
-            return ERR;
-        }
-    }
-
-    if ((fp = fopen(filepath, "w")) == NULL) {
-        printf("Error creating file.\n");
-        printf("Error number: %d\n", errno); 
+    if((file = fopen(login_filepath, "w")) == NULL){
+        printf("Error creating login file.\n");
         return ERR;
     }
 
-    if (fprintf(fp, "%s", user_uid) != strlen(user_uid)) {
-        printf("Error writing on file.\n");
+    if(fprintf(file, "%s", user_uid) != USER_UID_SIZE - 1){
+        printf("Error writing on login file.\n");
         return ERR;
     }
 
-    if (fclose(fp) != 0) {
-        printf("Error closing file.\n");
+    if (fclose(file) != 0) {
+        printf("Error closing login file.\n");
         return ERR;
     }
 
-    // File path to the "login.txt"
-    sprintf(filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_pass.txt"); // Watch out ! Bad implemention
-
-    if ((fp = fopen(filepath, "r")) == NULL) {
-        if(errno == ENOENT){
-            if ((fp = fopen(filepath, "r")) == NULL)
-                //!!!!
-        }
-        else {
-            perror("Error creating file.\n");
-            printf("Error number: %d\n", errno); 
-            return ERR;
-        }
-    }
-
-    if (fprintf(fp, "%s", password) != PASS_SIZE - 1) {
-        perror("Error writing on file.\n");
-        return ERR;
-    }
-
-    if (fclose(fp) != 0) {
-        printf("Error closing file.\n");
-        return ERR;
-    }
-
-    return LOGIN_REG;
+    return STATUS_OK;                               // returns 0
 }
 
-int user_delete(char *pass_filepath, char *login_filepath) { // deletes user's files and directory
-    char user_dir[USER_DIR_SIZE] = {0};
+int check_password(char* password, char* pass_filepath){
+    FILE *file;
+    char pass[PASS_SIZE] = {0};                     // pass read from the file '_pass.txt'
 
-    memcpy(user_dir, pass_filepath, USER_DIR_SIZE - 1);
-
-    // Removes the password file
-    if (remove(pass_filepath) != 0) {
-        perror("Error removing password file");
+    if((file = fopen(pass_filepath, "r")) == NULL){
+        printf("Error opening the pass file.\n");
         return ERR;
     }
 
-    // Remove the login file
-    if (remove(login_filepath) != 0) {
-        perror("Error removing login file");
+    if(fread(pass, sizeof(char), PASS_SIZE-1, file) != PASS_SIZE-1){
+        printf("Error reading the pass file.\n");
         return ERR;
     }
 
-    if (remove(user_dir) != 0) {
-        perror("Error removing user directory");
+    if(fclose(file) != 0){
+        printf("Error closing pass file.\n");
         return ERR;
     }
+
+    if(strcmp(pass, password) != 0)
+        return STATUS_NOK;
 
     return STATUS_OK;
 }
 
-int user_login(char *buffer) {
+int user_create(char *login_filepath, char *pass_filepath, char *user_uid, char *password) { // Creates user
     FILE *file;
-    char password[PASS_SIZE] = {0};         // user password read from the socket
-    char user_uid[USER_UID_SIZE] = {0};     // user uid read from the socket
-    char filepath[MAX_FILE_LENGH] = {0};    // password file path
-    char pass[PASS_SIZE] = {0};             // the pass read from the file
+    char user_dir[USER_DIR_SIZE] = {0};
+
+    // Get's the directory to be created (eg. user_dir = 'USERS/103074/')
+    memcpy(user_dir, login_filepath, USER_DIR_SIZE - 1);
+
+    // Creates the directory of the user (eg. USERS/'103074'/)
+    if (mkdir(user_dir, 0777) != 0) {
+        if (errno != EEXIST) {
+            printf("Error creating user directory.\n");
+            return ERR;
+        }
+    }
+
+    // Creates password file. (eg. USERS/103074/'103074_pass.txt')
+    if((file = fopen(pass_filepath, "w")) == NULL){
+        printf("Error creating pass file.\n");
+        return ERR;
+    }
+
+    if(fprintf(file, "%s", password) != PASS_SIZE - 1){
+        printf("Error writing on pass file.\n");
+        return ERR;
+    }
+
+    if (fclose(file) != 0) {
+        printf("Error closing pass file.\n");
+        return ERR;
+    }
+
+    if (create_login(user_uid, login_filepath) != STATUS_OK)
+        return ERR;
+
+    return LOGIN_REG;
+}
+
+int user_login(char *buffer) {
+    int check_pass_result;
+    char password[PASS_SIZE] = {0};                 // user password read from the socket
+    char user_uid[USER_UID_SIZE] = {0};             // user uid read from the socket
+    char login_filepath[MAX_FILE_LENGH] = {0};      // login file path
+    char pass_filepath[MAX_FILE_LENGH] = {0};       // password file path
 
     // Getting the user uid, and his password
     sscanf(buffer + 3, "%s %s\n", user_uid, password);
-    printf("|%s| |%s|\n", user_uid, password);
 
     // Checks password format
     if(strlen(password) != PASS_SIZE - 1){
@@ -107,55 +106,53 @@ int user_login(char *buffer) {
     }
 
     // Creating the file path
-    sprintf(filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_login.txt"); // Watch out ! Bad implemention
+    sprintf(login_filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_login.txt"); // Watch out ! Bad implemention
+    sprintf(pass_filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_pass.txt"); // Watch out ! Bad implemention
+    
+    if(access(login_filepath, F_OK) != -1)
+        return STATUS_OK;
 
-    if ((file = fopen(filepath, "r")) == NULL){ // If has error opening the file
-        if(errno == ENOENT)
-            return user_create(filepath, user_uid, password);
+    if(access(pass_filepath, F_OK) == -1)
+        return user_create(login_filepath, pass_filepath, user_uid, password);
 
-        else{
-            printf("Error opening the login file");
-            return ERR;
-        }
-    }
+    if((check_pass_result = check_password(password, pass_filepath)) == STATUS_OK)
+        return create_login(user_uid, login_filepath);
+    
+    return check_pass_result;
+}
 
-    if (fclose(file) != 0) {
-        printf("Error closing file.\n");
+int user_delete(char *pass_filepath, char *login_filepath) { // deletes user's files and directory
+    //char user_dir[USER_DIR_SIZE] = {0};
+    //memcpy(user_dir, pass_filepath, USER_DIR_SIZE - 1);
+
+    // Removes the password file
+    if (remove(pass_filepath) != 0) {
+        perror("Error removing password file");
         return ERR;
     }
 
-    sprintf(filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_pass.txt"); // Watch out ! Bad implemention
-    if ((file = fopen(filepath, "r")) == NULL){ // If has error opening the file
-        printf("Error opening the pass file");
+    // Remove the login file
+    if (remove(login_filepath) != 0) {
+        perror("Error removing login file");
         return ERR;
     }
 
-
-    fseek(file, 0, SEEK_SET);
-
-    if (fread(pass, sizeof(char), PASS_SIZE - 1, file) != PASS_SIZE - 1){
-        printf("Error reading the file.\n");
+    /*
+    if (remove(user_dir) != 0) {
+        perror("Error removing user directory");
         return ERR;
     }
-
-    if (strcmp(pass, password) != 0)
-        return STATUS_NOK;
-
-    if (fclose(file) != 0) {
-        printf("Error closing file.\n");
-        return ERR;
-    }
+    */
 
     return STATUS_OK;
 }
 
 int user_unregister(char *buffer) {
-    FILE *fp;
+    int check_pass_result;
     char password[PASS_SIZE] = {0};         // user password read from the socket
     char user_uid[USER_UID_SIZE] = {0};     // user uid read from the socket
     char pass_filepath[MAX_FILE_LENGH] = {0};    // password file path
     char login_filepath[MAX_FILE_LENGH] = {0};    // login file path
-    char pass[PASS_SIZE] = {0};             // the pass read from the file
 
     // Getting the user uid, and his password
     sscanf(buffer + 3, "%s %s\n", user_uid, password);
@@ -165,88 +162,48 @@ int user_unregister(char *buffer) {
     sprintf(pass_filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_pass.txt"); // !
     sprintf(login_filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_login.txt"); // !
 
-    if ((fp = fopen(pass_filepath, "r")) == NULL){ // If has error opening the file w/ password
-        if(errno == ENOENT)
-            return UNREG_UNR;
-
-        else{
-            printf("Error looking for pass file");
-            return ERR;
-        }
-    }
-
-    if (fread(pass, sizeof(char), PASS_SIZE-1, fp) != PASS_SIZE-1){
-        printf("Error reading the file.\n");
-        return ERR;
-    }
-
-    if (fclose(fp) != 0) {
-        printf("Error closing file.\n");
-        return ERR;
-    }
-
-    // Checks if user is logged in
-    if ((fp = fopen(login_filepath, "r")) == NULL){ // If doesn't find the login file
-        if(errno == ENOENT) {
-            printf("Error looking for login file.");
-            return STATUS_NOK;
-        }
-
-        else {
-            printf("Error opening the login file.");
-            return ERR;
-        }
-    }
-
-    if (fclose(fp) != 0) {
-        printf("Error closing file.\n");
-        return ERR;
-    }
-
-    if(strcmp(pass, password) != 0){
-        printf("Passwords doesn't meet.");
+    if (access(login_filepath, F_OK) == -1)
         return STATUS_NOK;
-    }
 
-    return user_delete(pass_filepath, login_filepath);
+    if (access(pass_filepath, F_OK) == -1)
+        return UNREG_UNR;
+
+    if((check_pass_result = check_password(password, pass_filepath)) == STATUS_OK)
+        return user_delete(pass_filepath, login_filepath);
+
+    return check_pass_result;
 }
 
 int user_logout(char *buffer) {
-    FILE *file;
-    char user_uid[USER_UID_SIZE] = {0};     // user uid read from the socket
-    char login_filepath[MAX_FILE_LENGH] = {0};    // password file path
-    char pass_filepath[MAX_FILE_LENGH] = {0};
-    
-    // Getting the user uid, and his password
-    strncpy(user_uid, buffer + CODE_SIZE, USER_UID_SIZE - 1);
+    int check_pass_result;
+    char user_uid[USER_UID_SIZE] = {0};             // user uid read from the socket
+    char password[PASS_SIZE] = {0};                 // password read from the buffer received
+    char login_filepath[MAX_FILE_LENGH] = {0};      // login file path
+    char pass_filepath[MAX_FILE_LENGH] = {0};       // password file path
 
+    // Getting the user uid, and his password
+    sscanf(buffer + 3, "%s %s\n", user_uid, password);
+
+    // Creating the path's
     sprintf(login_filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_login.txt"); // Watch out ! Bad implemention
     sprintf(pass_filepath, "%s%s%s%s%s", USERS_DIR, user_uid, "/", user_uid, "_pass.txt"); // Watch out ! Bad implemention
-    
-    if((file = fopen(pass_filepath, "r")) == NULL){
-        if(errno == ENOENT)
-            return LOGOUT_UNR;
-        else {
-            printf("Error opening login file.\n");
+
+    if(access(login_filepath, F_OK) == -1)
+        return STATUS_NOK;
+
+    if(access(pass_filepath, F_OK) == -1)
+        return LOGOUT_UNR;
+
+    if((check_pass_result = check_password(password, pass_filepath)) == STATUS_OK){
+        // Remove the login file
+        if (remove(login_filepath) != 0) {
+            perror("Error removing login file");
             return ERR;
         }
+        return STATUS_OK;
     }
 
-    if(fclose(file) != 0){
-        printf("Error closing login file.\n");
-        return ERR;
-    }
-
-    if(remove(login_filepath) != 0){
-        if(errno == ENOENT)
-            return STATUS_NOK;
-        else {
-            printf("Error removing login file.\n");
-            return ERR;
-        }
-    }
-
-    return STATUS_OK;
+    return check_pass_result;
 }
 
 int main() {
@@ -327,7 +284,7 @@ int main() {
                 case LOGIN_REG:
                     strcpy(answer, "RLI REG");
                     break;
-                
+
                 default:
                     strcpy(answer, "RLI ERR");
                     break;
