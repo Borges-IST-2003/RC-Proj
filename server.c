@@ -267,7 +267,7 @@ int list_user_auctions(char *buffer, char *answer) {
         strcat(answer, " ");
     }
 
-    // ! Missing states
+    // # Missing states
 
     // Close the directory
     closedir(dir);
@@ -315,7 +315,7 @@ int list_user_bids(char *buffer, char *answer) {
         strcat(answer, " ");
     }
 
-    // ! Missing states
+    // # Missing states
 
     // Close the directory
     closedir(dir);
@@ -347,12 +347,13 @@ int list_auctions(char *answer) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
+        // There will be sub directories #
         is_open++;
         strncat(answer, entry->d_name, 3);
         strcat(answer, " ");
     }
 
-    // ! Missing states
+    // # Missing states
 
     // Close the directory
     closedir(dir);
@@ -362,6 +363,8 @@ int list_auctions(char *answer) {
 
     return STATUS_OK;
 }
+
+
 
 int max(int a, int b){
     return (a > b ? a : b);
@@ -376,8 +379,8 @@ void udp_handler(){
         exit(1);
 
     memcpy(message_code, buffer, 3);
-    write(1, "received: ", 10);         // !
-    write(1, buffer, udp_n);            // !
+    write(1, "received: ", 10);         // #
+    write(1, buffer, udp_n);            // #
     if(strcmp(message_code, "LIN") == 0){
         switch (user_login(buffer)){
             case STATUS_OK:
