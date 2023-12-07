@@ -17,12 +17,17 @@
 #define USERS_DIR "USERS/"
 #define AUCTIONS_DIR "AUCTIONS/"
 
+#define DEFAULT 128
 #define MAX_FILE_LENGTH 30
 #define USER_SUB_DIR_LENGTH 20
 #define AUCTIONS_DIR_LENGTH 11
 #define USER_DIR_SIZE 13
 #define USER_UID_SIZE 7
 #define PASS_SIZE 9
+#define AUCT_NAME 11
+#define START_VALUE 7
+#define TIME_ACTIVE 6
+#define AID 4
 
 #define ERR -1
 #define STATUS_OK 0
@@ -34,6 +39,14 @@
 #define LOGOUT_UNR 2
 #define RMA_NLG 2
 #define RMB_NLG 2
+
+#define LIN_SIZE 20
+#define LOU_SIZE 20
+#define UNR_SIZE 20
+#define LMA_SIZE 11
+#define LMB_SIZE 11
+#define LST_SIZE 4
+#define SRC_SIZE 8
 
 #define PORT "58011"
 

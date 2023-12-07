@@ -1,5 +1,7 @@
 #include "server.h"
 
+// UDP functions
+
 // Creates the login file
 int create_login(const char* user_uid, const char* login_filepath){
     FILE *file;
@@ -133,7 +135,7 @@ int user_delete(const char *pass_filepath, const char *login_filepath) {
     return STATUS_OK;
 }
 
-int user_login(char *buffer) {
+int user_login(const char *buffer){
     int check_pass_result;
     char password[PASS_SIZE] = {0};                 // user password read from the socket
     char user_uid[USER_UID_SIZE] = {0};             // user uid read from the socket
@@ -142,6 +144,7 @@ int user_login(char *buffer) {
 
     // Getting the user uid, and his password
     sscanf(buffer + 3, "%s %s\n", user_uid, password);
+    printf("|%s| |%s|\n", user_uid, password);
 
     // Checks password format
     if(strlen(password) != PASS_SIZE - 1){
@@ -171,7 +174,7 @@ int user_login(char *buffer) {
     return check_pass_result;
 }
 
-int user_unregister(char *buffer) {
+int user_unregister(const char *buffer) {
     int check_pass_result;
     char password[PASS_SIZE] = {0};         // user password read from the socket
     char user_uid[USER_UID_SIZE] = {0};     // user uid read from the socket
@@ -198,7 +201,7 @@ int user_unregister(char *buffer) {
     return check_pass_result;
 }
 
-int user_logout(char *buffer) {
+int user_logout(const char *buffer) {
     int check_pass_result;
     char user_uid[USER_UID_SIZE] = {0};             // user uid read from the socket
     char password[PASS_SIZE] = {0};                 // password read from the buffer received
@@ -230,7 +233,7 @@ int user_logout(char *buffer) {
     return check_pass_result;
 }
 
-int list_user_auctions(char *buffer, char *answer) {
+int list_user_auctions(const char *buffer, char *answer) {
     DIR *dir;
     struct dirent *entry;
     int is_open = 0;                                    // nº of files in a dir
@@ -278,7 +281,7 @@ int list_user_auctions(char *buffer, char *answer) {
     return STATUS_OK;
 }
 
-int list_user_bids(char *buffer, char *answer) {
+int list_user_bids(const char *buffer, char *answer) {
     DIR *dir;
     struct dirent *entry;
     int is_open= 0;                                     // nº of files in a dir
@@ -364,8 +367,51 @@ int list_auctions(char *answer) {
     return STATUS_OK;
 }
 
+// TCP functions
 
+int read_tcp(char* buffer, int len){ //jorge = bytes_read
+    int jorge = 0;
+    while(len > 0){
+        jorge = read(tcp_newfd, buffer, len);
+        if(jorge == -1){
+            return ERR;
+        }
+        len -= jorge;
+        buffer += jorge;
+    }
+    return STATUS_OK;
+}
 
+int write_tcp(char* buffer, int len){ //jorge = bytes_read
+    int jorge = 0;
+    while(len > 0){
+        jorge = write(tcp_newfd, buffer, len);
+        if(jorge == -1){
+            return ERR;
+        }
+        len -= jorge;
+        buffer += jorge;
+    }
+    return STATUS_OK;
+}
+
+/*
+int open(const char* buffer){
+    char user_uid[USER_UID_SIZE] = {0};
+    char password[PASS_SIZE] = {0};
+    char name[AUCT_NAME] = {0};
+    char start_value[START_VALUE] = {0};
+    char timeactive[TIME_ACTIVE] = {0};
+    char file_name[DEFAULT] = {0};
+    int file_size = 0;
+    size_t file_data = 0;
+    //char login_filepath[MAX_FILE_LENGTH] = {0};      // login file path
+    //char pass_filepath[MAX_FILE_LENGTH] = {0};       // password file path
+
+    sscanf(buffer + 3, "%s %s %s %s %s %s %s %s\n", user_uid, password, name, start_value, timeactive, file_name, file_size, file_data);
+    return 0;
+}
+*/
 int max(int a, int b){
     return (a > b ? a : b);
 }
@@ -375,125 +421,171 @@ void udp_handler(){
     char answer[MAX_MSG_LEN] = {0};
     udp_addrlen = sizeof(udp_addr);
     udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+
     if (udp_n == -1)
         exit(1);
+    write(1, "received: ", 10);
+    write(1, buffer, udp_n);
+    memcpy(message_code, buffer, CODE_SIZE);
+    printf("ola1\n");
+    if(strcmp(message_code, "LIN ") == 0){
+        if(udp_n != LIN_SIZE)
+            strcpy(answer, "RLI ERR");
 
-    memcpy(message_code, buffer, 3);
-    write(1, "received: ", 10);         // #
-    write(1, buffer, udp_n);            // #
-    if(strcmp(message_code, "LIN") == 0){
-        switch (user_login(buffer)){
-            case STATUS_OK:
-                strcpy(answer, "RLI OK");
-                break;
-            
-            case STATUS_NOK:
-                strcpy(answer, "RLI NOK");
-                break;
-            
-            case LOGIN_REG:
-                strcpy(answer, "RLI REG");
-                break;
+        else{
+            switch (user_login(buffer)){
+                case STATUS_OK:
+                    strcpy(answer, "RLI OK");
+                    break;
+                
+                case STATUS_NOK:
+                    strcpy(answer, "RLI NOK");
+                    break;
+                
+                case LOGIN_REG:
+                    strcpy(answer, "RLI REG");
+                    break;
 
-            default:
-                strcpy(answer, "RLI ERR");
-                break;
+                default:
+                    strcpy(answer, "RLI ERR");
+                    break;
+            }
         }
     }
 
-    else if(strcmp(message_code, "LOU") == 0){
-        switch (user_logout(buffer)){
-            case STATUS_OK:
-                strcpy(answer, "RLO OK");
-                break;
-            
-            case STATUS_NOK:
-                strcpy(answer, "RLO NOK");
-                break;
-            
-            case LOGOUT_UNR:
-                strcpy(answer, "RLO UNR");
-                break;
-            
-            default:
-                strcpy(answer, "RLO ERR");
-                break;
+    else if(strcmp(message_code, "LOU ") == 0){
+        udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+        if(udp_n != LOU_SIZE)
+            strcpy(answer, "RLO ERR");
+
+        else{
+            switch (user_logout(buffer)){
+                case STATUS_OK:
+                    strcpy(answer, "RLO OK");
+                    break;
+                
+                case STATUS_NOK:
+                    strcpy(answer, "RLO NOK");
+                    break;
+                
+                case LOGOUT_UNR:
+                    strcpy(answer, "RLO UNR");
+                    break;
+                
+                default:
+                    strcpy(answer, "RLO ERR");
+                    break;
+            }
         }
     }
 
-    else if(strcmp(message_code, "UNR") == 0){
-        switch (user_unregister(buffer)){
-            case STATUS_OK:
-                strcpy(answer, "RUR OK");
-                break;
-            
-            case STATUS_NOK:
-                strcpy(answer, "RUR NOK");
-                break;
-            
-            case UNREG_UNR:
-                strcpy(answer, "RUR UNR");
-                break;
-            
-            default:
-                strcpy(answer, "RUR ERR");
-                break;
+    else if(strcmp(message_code, "UNR ") == 0){
+        udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+        if(udp_n != UNR_SIZE)
+            strcpy(answer, "RUR ERR");
+
+        else {
+            switch (user_unregister(buffer)){
+                case STATUS_OK:
+                    strcpy(answer, "RUR OK");
+                    break;
+                
+                case STATUS_NOK:
+                    strcpy(answer, "RUR NOK");
+                    break;
+                
+                case UNREG_UNR:
+                    strcpy(answer, "RUR UNR");
+                    break;
+                
+                default:
+                    strcpy(answer, "RUR ERR");
+                    break;
+            }
         }
     }
     
-    else if(strcmp(message_code, "LMA") == 0){
-        switch (list_user_auctions(buffer, answer)) {
-            case STATUS_OK:
-                break;
-            
-            case STATUS_NOK:
-                strcpy(answer, "RMA NOK");
-                break;
-            
-            case RMA_NLG:
-                strcpy(answer, "RMA UNR");
-                break;
-            
-            default:
-                strcpy(answer, "RMA ERR");
-                break;
+    else if(strcmp(message_code, "LMA ") == 0){
+        udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+        if(udp_n != LMA_SIZE)
+            strcpy(answer, "RMA ERR");
+
+        else {    
+            switch (list_user_auctions(buffer, answer)) {
+                case STATUS_OK:
+                    break;
+                
+                case STATUS_NOK:
+                    strcpy(answer, "RMA NOK");
+                    break;
+                
+                case RMA_NLG:
+                    strcpy(answer, "RMA UNR");
+                    break;
+                
+                default:
+                    strcpy(answer, "RMA ERR");
+                    break;
+            }
         }
     }
 
-    else if(strcmp(message_code, "LMB") == 0){
-        switch (list_user_bids(buffer, answer)) {
-            case STATUS_OK:
-                break;
-            
-            case STATUS_NOK:
-                strcpy(answer, "RMB NOK");
-                break;
-            
-            case RMB_NLG:
-                strcpy(answer, "RMB UNR");
-                break;
-            
-            default:
-                strcpy(answer, "RMB ERR");
-                break;
+    else if(strcmp(message_code, "LMB ") == 0){
+        udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+        if(udp_n != LMB_SIZE)
+            strcpy(answer, "RMB ERR");
+
+        else {   
+            switch (list_user_bids(buffer, answer)) {
+                case STATUS_OK:
+                    break;
+                
+                case STATUS_NOK:
+                    strcpy(answer, "RMB NOK");
+                    break;
+                
+                case RMB_NLG:
+                    strcpy(answer, "RMB UNR");
+                    break;
+                
+                default:
+                    strcpy(answer, "RMB ERR");
+                    break;
+            }
         }
     }
 
-    else if(strcmp(message_code, "LST") == 0){
-        switch (list_auctions(answer)) {
-            case STATUS_OK:
-                break;
-            
-            case STATUS_NOK:
-                strcpy(answer, "RLS NOK");
-                break;
-            
-            default:
-                strcpy(answer, "RLS ERR");
-                break;
+    else if(strcmp(message_code, "LST ") == 0){
+        udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+        if(udp_n != LST_SIZE)
+            strcpy(answer, "RLS ERR");
+
+        else {
+            switch (list_auctions(answer)) {
+                case STATUS_OK:
+                    break;
+                
+                case STATUS_NOK:
+                    strcpy(answer, "RLS NOK");
+                    break;
+                
+                default:
+                    strcpy(answer, "RLS ERR");
+                    break;
+            }
         }
     }
 
+    else if(strcmp(message_code, "SRC ") == 0){
+        udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
+        if(udp_n != SRC_SIZE){
+            strcpy(answer, "RRC ERR");
+        }
+        else{
+            return;
+        }
+    }
+    
     udp_n = sendto(udp_fd, answer, strlen(answer), 0,(struct sockaddr *)&udp_addr, udp_addrlen);
         if (udp_n == -1) /*error*/
             exit(1);
@@ -502,12 +594,14 @@ void udp_handler(){
 }
 
 void tcp_handler(int tcp_newfd){
-    
-    tcp_n = read(tcp_newfd, buffer, MAX_MSG_LEN);
-    
-    if(tcp_n == -1)
+    char message_code[CODE_SIZE] = {0};
+    if((read_tcp(message_code, CODE_SIZE + 1)) != STATUS_OK)
         exit(1);
-    
+
+    if(message_code[4] != " "){
+        tcp_n = write(tcp_newfd)
+    }
+
     write(1, "received: ", 10);
     write(1, buffer, tcp_n);
 
@@ -521,7 +615,7 @@ void tcp_handler(int tcp_newfd){
     return;
 }
 
-int main() {
+int main(){
     // UDP setup
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd == -1)
