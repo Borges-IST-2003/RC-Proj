@@ -45,7 +45,67 @@ int udp_connect(char *message, int message_len) {
     return 0;
 }
 
+
+//sends size of file in bytes and file data
+int send_file(int fd, char *filepath){
+    char data[BUFFER_SIZE + 1] = {0};
+    int fd_file, bytes_read = 0;
+    char space = ' ';
+
+    if((fd_file = open(filepath, O_RDONLY)) == NULL){
+        return -1;
+    }
+
+    struct stat file_info;
+    
+    if(fstat(fd, &file_info) != 0){
+        return -1;
+    }
+    long long file_size = file_info.st_size;
+
+    if(write(fd, &file_size, sizeof(long long)) == -1){
+        return -1;
+    }
+
+    if(write(fd, &space, sizeof(char)) == -1){
+        return -1;
+    }
+
+    while((bytes_read = read(fd_file, data, BUFFER_SIZE)) != 0){
+        n = write(fd, data, BUFFER_SIZE);
+        write(1, data, BUFFER_SIZE);
+        if (n == -1) /*error*/
+            return -1;
+    }
+    close(fd_file);
+}
+
+//reads filename
+int read_back_until(char *buffer, char stopchar, char *destination){
+    int ix = strlen(buffer) - 1;
+    int dest_size = 0;
+
+    while(buffer[ix] != stopchar){
+        dest_size++;
+        ix--;
+        if (ix < 0)
+            return -1;
+    }
+
+    ix = strlen(buffer) - 1;
+
+    while(dest_size){
+        destination[dest_size] = buffer[ix];
+        ix--;
+        dest_size--;
+    }
+
+    return 0;
+}
+
 int tcp_connect(char *message, int message_len) {
+    char *filepath[100] = {0};
+    
     fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
     if (fd == -1)
         return -1; // error
@@ -57,18 +117,30 @@ int tcp_connect(char *message, int message_len) {
     errcode = getaddrinfo("127.0.0.1", PORT, &hints, &res);
     if (errcode != 0) /*error*/
         return -1;
+
     n = connect(fd, res->ai_addr, res->ai_addrlen);
     if (n == -1) /*error*/
         return -1;
+
     n = write(fd, message, message_len);
     if (n == -1) /*error*/
         return -1;
+
     n = read(fd, buffer, 128);
     if (n == -1) /*error*/
         return -1;
 
     write(1, "sent: ", 6);
     write(1, message, message_len);
+    if(strlen(message) > 30){
+        if (read_back_until(message, ' ', filepath) == -1)
+            return -1;  //error
+        
+        if (send_file(fd, filepath) == -1)
+            return -1;  //error
+    }
+
+    
     write(1, "ans: ", 5);
     write(1, buffer, n);
 
@@ -76,6 +148,7 @@ int tcp_connect(char *message, int message_len) {
     close(fd);
     return 0;
 }
+
 
 int main() {
     char message_code[CODE_SIZE] = {0};

@@ -598,7 +598,7 @@ void tcp_handler(int tcp_newfd){
     if((read_tcp(message_code, CODE_SIZE + 1)) != STATUS_OK)
         exit(1);
 
-    if(message_code[4] != " "){
+    if(message_code[4] != ' '){
         tcp_n = write(tcp_newfd)
     }
 
