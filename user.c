@@ -45,31 +45,59 @@ int udp_connect(char *message, int message_len) {
     return 0;
 }
 
+void long_long_to_string(long long fsize, char *fsize_string){
+    long long ix = 1;
+    int num_car = 0;
+    while(ix <fsize){
+        ix = ix * 10;
+        num_car++;
+    }
+
+    while(fsize > 0){
+        fsize_string[num_car] = '0' + fsize%10;
+        fsize = fsize / 10;
+    }
+}
 
 //sends size of file in bytes and file data
 int send_file(int fd, char *filepath){
     char data[BUFFER_SIZE + 1] = {0};
+    char file_size_string[32] = {0};
     int fd_file, bytes_read = 0;
     char space = ' ';
 
-    if((fd_file = open(filepath, O_RDONLY)) == NULL){
+    if((fd_file = open(filepath, O_RDONLY)) == -1){
+        printf("opening error\n");
         return -1;
     }
 
     struct stat file_info;
     
-    if(fstat(fd, &file_info) != 0){
+    if(fstat(fd_file, &file_info) != 0){
         return -1;
     }
-    long long file_size = file_info.st_size;
 
-    if(write(fd, &file_size, sizeof(long long)) == -1){
-        return -1;
-    }
+    long long file_size = file_info.st_size;
+    long_long_to_string(file_size, file_size_string);
 
     if(write(fd, &space, sizeof(char)) == -1){
         return -1;
     }
+    
+    write(1, &space, sizeof(char));
+
+    if(write(fd, file_size_string, sizeof(file_size_string)) == -1){
+        return -1;
+    }
+    
+    write(1, file_size_string, sizeof(file_size_string));
+
+
+    if(write(fd, &space, sizeof(char)) == -1){
+        return -1;
+    }
+
+    write(1, &space, sizeof(char));
 
     while((bytes_read = read(fd_file, data, BUFFER_SIZE)) != 0){
         n = write(fd, data, BUFFER_SIZE);
@@ -77,7 +105,9 @@ int send_file(int fd, char *filepath){
         if (n == -1) /*error*/
             return -1;
     }
+
     close(fd_file);
+    return 0;
 }
 
 //reads filename
@@ -86,25 +116,29 @@ int read_back_until(char *buffer, char stopchar, char *destination){
     int dest_size = 0;
 
     while(buffer[ix] != stopchar){
-        dest_size++;
-        ix--;
         if (ix < 0)
             return -1;
+        dest_size++;
+        ix--;
     }
 
     ix = strlen(buffer) - 1;
 
+
     while(dest_size){
-        destination[dest_size] = buffer[ix];
-        ix--;
         dest_size--;
+        if (buffer[ix] != '\n')
+            destination[dest_size] = buffer[ix];
+        ix--;
     }
 
     return 0;
 }
 
 int tcp_connect(char *message, int message_len) {
-    char *filepath[100] = {0};
+    char filepath[100] = {0};
+    char new_line = '\n';
+    message[strlen(message)-1] = '\0';
     
     fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
     if (fd == -1)
@@ -132,15 +166,21 @@ int tcp_connect(char *message, int message_len) {
 
     write(1, "sent: ", 6);
     write(1, message, message_len);
-    if(strlen(message) > 30){
-        if (read_back_until(message, ' ', filepath) == -1)
+    
+    if(message[0] == 'O' && message[1] == 'P' && message[2] == 'A'){
+        char filename[90] = {0};
+        if (read_back_until(message, ' ', filename) == -1)
             return -1;  //error
+
+        strcpy(filepath, "ASSETS/");
+        strcat(filepath, filename);
         
         if (send_file(fd, filepath) == -1)
             return -1;  //error
     }
+    write(fd, &new_line, sizeof(char));
+    write(1, &new_line, sizeof(char));
 
-    
     write(1, "ans: ", 5);
     write(1, buffer, n);
 
