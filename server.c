@@ -2,6 +2,26 @@
 
 // UDP functions
 
+int valid_pass(char* pass){
+    if(strlen(pass) != PASS_SIZE - 1) return ERR;
+    while (*pass) {
+        if (!isalnum(*pass))
+            return ERR;                 // Not alphanumeric
+        ++pass;                         // Move to the next character
+    }
+    return STATUS_OK;
+}
+
+int valid_uid(char* uid){
+    if(strlen(uid) != USER_UID_SIZE - 1) return ERR;
+    while (*uid) {
+        if (!isdigit(*uid))
+            return ERR;                 // Not digit
+        ++uid;                          // Move to the next character
+    }
+    return STATUS_OK;
+}
+
 // Creates the login file
 int create_login(const char* user_uid, const char* login_filepath){
     FILE *file;
@@ -110,9 +130,6 @@ int user_create(const char *login_filepath, const char *pass_filepath, const cha
 
 // Deletes user's pass and login files
 int user_delete(const char *pass_filepath, const char *login_filepath) {
-    //char user_dir[USER_DIR_SIZE] = {0};
-    //memcpy(user_dir, pass_filepath, USER_DIR_SIZE - 1);
-
     // Removes the password file
     if (remove(pass_filepath) != 0) {
         perror("Error removing password file");
@@ -144,17 +161,16 @@ int user_login(const char *buffer){
 
     // Getting the user uid, and his password
     sscanf(buffer + 3, "%s %s\n", user_uid, password);
-    printf("|%s| |%s|\n", user_uid, password);
 
     // Checks password format
-    if(strlen(password) != PASS_SIZE - 1){
-        printf("Wrong password format.");
+    if(valid_pass(password) == ERR){
+        printf("Wrong password format.\n");
         return ERR;
     }
 
     // Checks user_uid format
-    if(strlen(user_uid) != USER_UID_SIZE - 1){
-        printf("Wrong user id format.");
+    if(valid_uid(user_uid) == ERR){
+        printf("Wrong user id format.\n");
         return ERR;
     }
 
@@ -183,7 +199,18 @@ int user_unregister(const char *buffer) {
 
     // Getting the user uid, and his password
     sscanf(buffer + 3, "%s %s\n", user_uid, password);
-    printf("|%s| |%s|\n", user_uid, password);
+
+    // Checks password format
+    if(valid_pass(password) == ERR){
+        printf("Wrong password format.\n");
+        return ERR;
+    }
+
+    // Checks user_uid format
+    if(valid_uid(user_uid) == ERR){
+        printf("Wrong user id format.\n");
+        return ERR;
+    }
 
     // Creating the file paths
     sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid); 
@@ -210,6 +237,18 @@ int user_logout(const char *buffer) {
 
     // Getting the user uid, and his password
     sscanf(buffer + 3, "%s %s\n", user_uid, password);
+
+    // Checks password format
+    if(valid_pass(password) == ERR){
+        printf("Wrong password format.\n");
+        return ERR;
+    }
+
+    // Checks user_uid format
+    if(valid_uid(user_uid) == ERR){
+        printf("Wrong user id format.\n");
+        return ERR;
+    }
 
     // Creating the paths
     sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid); 
@@ -242,6 +281,12 @@ int list_user_auctions(const char *buffer, char *answer) {
     char hosted_dir[USER_SUB_DIR_LENGTH] = {0};         // hosted directory
 
     sscanf(buffer + 3, "%s\n", user_uid);
+
+    // Checks user_uid format
+    if(valid_uid(user_uid) == ERR){
+        printf("Wrong user id format.\n");
+        return ERR;
+    }
 
     sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid);
     sprintf(hosted_dir, "%s%s/HOSTED", USERS_DIR, user_uid);
@@ -290,6 +335,12 @@ int list_user_bids(const char *buffer, char *answer) {
     char bidded_dir[USER_SUB_DIR_LENGTH] = {0};         // bidded directory
 
     sscanf(buffer + 3, "%s\n", user_uid);
+
+    // Checks user_uid format
+    if(valid_uid(user_uid) == ERR){
+        printf("Wrong user id format.\n");
+        return ERR;
+    }
 
     sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid);
     sprintf(bidded_dir, "%s%s/BIDDED", USERS_DIR, user_uid);
@@ -369,20 +420,24 @@ int list_auctions(char *answer) {
 
 // TCP functions
 
-int read_tcp(char* buffer, int len){ //jorge = bytes_read
+int tcp_read(char* buffer, int len){ //jorge = bytes read
     int jorge = 0;
     while(len > 0){
         jorge = read(tcp_newfd, buffer, len);
-        if(jorge == -1){
+        if(jorge == -1)
             return ERR;
-        }
+
+        if(jorge == 0) //closed by peer
+            break;
+
         len -= jorge;
         buffer += jorge;
     }
+
     return STATUS_OK;
 }
 
-int write_tcp(char* buffer, int len){ //jorge = bytes_read
+int tcp_write(char* buffer, int len){ //jorge = bytes written
     int jorge = 0;
     while(len > 0){
         jorge = write(tcp_newfd, buffer, len);
@@ -395,39 +450,120 @@ int write_tcp(char* buffer, int len){ //jorge = bytes_read
     return STATUS_OK;
 }
 
-/*
+// Like the tcp_read but doesn't have a fix size
+int read_next_word(char *buffer, int max){
+    int i = 0;
+    while (1) {
+        if (tcp_read(&buffer[i], 1) == ERR)
+            return ERR;
+
+        if(i >= max-2 || buffer[i] == ' ')
+            break;
+
+        if(buffer[i] == '\n' || buffer[i] == '\0')
+            return STATUS_NOK;
+
+        i++;
+    }
+
+    buffer[i] = '\0';  // Null-terminate the string
+
+    return STATUS_OK;
+}
+
 int open(const char* buffer){
+    // #
+    // # Verify everything
     char user_uid[USER_UID_SIZE] = {0};
     char password[PASS_SIZE] = {0};
     char name[AUCT_NAME] = {0};
     char start_value[START_VALUE] = {0};
-    char timeactive[TIME_ACTIVE] = {0};
-    char file_name[DEFAULT] = {0};
+    char time_active[TIME_ACTIVE] = {0};
+    char img_name[DEFAULT] = {0};
+    char file_size_str[5] = {0};
     int file_size = 0;
-    size_t file_data = 0;
-    //char login_filepath[MAX_FILE_LENGTH] = {0};      // login file path
-    //char pass_filepath[MAX_FILE_LENGTH] = {0};       // password file path
+    char login_filepath[MAX_FILE_LENGTH] = {0};      // login file path
+    char pass_filepath[MAX_FILE_LENGTH] = {0};       // password file path
+    int check_pass_result, aux = STATUS_OK;             // Remove = STATUS_OK
 
-    sscanf(buffer + 3, "%s %s %s %s %s %s %s %s\n", user_uid, password, name, start_value, timeactive, file_name, file_size, file_data);
-    return 0;
+    if(sscanf(buffer, "%s %s ", user_uid, password) != 2){
+        printf("Wrong format in open() function.\n");
+        return ERR;
+    }
+
+    if(read_next_word(name, AUCT_NAME) != STATUS_OK){
+        printf("Error reading the name in open().\n");
+        return ERR;
+    }
+
+    if(read_next_word(start_value, START_VALUE) != STATUS_OK){
+        printf("Error reading the start_value in open().\n");
+        return ERR;
+    }
+
+    if(read_next_word(time_active, TIME_ACTIVE) != STATUS_OK){
+        printf("Error reading the time_active in open().\n");
+        return ERR;
+    }
+
+    if(read_next_word(img_name, DEFAULT) != STATUS_OK){
+        printf("Error reading the img_name in open().\n");
+        return ERR;
+    }
+
+    if(read_next_word(file_size_str, 5) != STATUS_OK){
+        printf("Error reading the img_name in open().\n");
+        return ERR;
+    }
+
+    if((file_size = atoi(file_size_str)) == 0){
+        printf("A non valid integer read in file_size_str.\n");
+        return ERR;
+    }
+    file_size++; //'\0' space :)
+
+    char *file_data = (char *)malloc(file_size * sizeof(char)); 
+    if(tcp_read(file_data, file_size) == ERR){
+        printf("Error reading image file from socket.\n");
+        return ERR;
+    }
+    file_data[strlen(file_data)- 1] = '\0';         // Subs the '\n' with '\0';
+
+    printf("|%s|\n", file_data);
+
+    sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid);
+    sprintf(pass_filepath, "%s%s/%s_pass.txt", USERS_DIR, user_uid, user_uid);
+    if(access(login_filepath, F_OK) != -1)
+        return ROA_NLG;
+    
+    if((check_pass_result = check_password(password, pass_filepath)) == STATUS_OK){
+        // # aux = create_auction(name, time_active, img_name, file_size, file_data);
+        free(file_data);
+        return aux;
+    }
+
+    free(file_data);
+
+    return check_pass_result;
 }
-*/
+
 int max(int a, int b){
     return (a > b ? a : b);
 }
 
 void udp_handler(){
-    char message_code[CODE_SIZE] = {0};
+    char buffer[MAX_MSG_LEN] = {0};
+    char message_code[CODE_SIZE + 1] = {0};
     char answer[MAX_MSG_LEN] = {0};
     udp_addrlen = sizeof(udp_addr);
     udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
 
     if (udp_n == -1)
         exit(1);
+    memcpy(message_code, buffer, CODE_SIZE);
     write(1, "received: ", 10);
     write(1, buffer, udp_n);
-    memcpy(message_code, buffer, CODE_SIZE);
-    printf("ola1\n");
+
     if(strcmp(message_code, "LIN ") == 0){
         if(udp_n != LIN_SIZE)
             strcpy(answer, "RLI ERR");
@@ -586,31 +722,63 @@ void udp_handler(){
         }
     }
     
+    else {
+        strcpy(answer, "ERR Wrong Format");
+    }
+
     udp_n = sendto(udp_fd, answer, strlen(answer), 0,(struct sockaddr *)&udp_addr, udp_addrlen);
         if (udp_n == -1) /*error*/
             exit(1);
-    
+
     return;
 }
 
 void tcp_handler(int tcp_newfd){
-    char message_code[CODE_SIZE] = {0};
-    if((read_tcp(message_code, CODE_SIZE + 1)) != STATUS_OK)
+    char buffer[MAX_MSG_LEN] = {0};
+    char answer[MAX_MSG_LEN] = {0};
+    char message_code[CODE_SIZE+1] = {0};
+    if((tcp_read(message_code, CODE_SIZE)) == ERR)
         exit(1);
 
-    if(message_code[4] != ' '){
-        tcp_n = write(tcp_newfd)
+    printf("Code received: |%s|\n", message_code);
+
+    if(strcmp(message_code, "OPA ") == 0){
+        if(tcp_read(buffer, OPEN_SIZE) == ERR)
+            exit(1);
+        switch (open(buffer)) {
+
+        case STATUS_OK:
+            strcpy(answer, "ROA OK");
+            break;
+        
+        default:
+            strcpy(answer, "ROA ERR");
+            break;
+        }
     }
 
-    write(1, "received: ", 10);
-    write(1, buffer, tcp_n);
-
-    // Code
-
-    tcp_n = write(tcp_newfd, buffer, tcp_n);
-    if(tcp_n == -1)
-        exit(1);
+    else if(strcmp(message_code, "CLS ") == 0){
+        return;
+    }
     
+    else if(strcmp(message_code, "SAS ") == 0){
+        return;
+    }
+    
+    else if(strcmp(message_code, "BID ") == 0){
+        return;
+    }
+
+    else{
+        strcpy(answer, "Invalid operand.\n");
+    }
+    
+    if(tcp_write(answer, strlen(answer)) == ERR){
+        printf("Error sending client message TCP.\n");    
+        exit(1);
+    }
+        
+
     close(tcp_newfd);
     return;
 }

@@ -10,12 +10,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <ctype.h>
 
 //"USERS/103074/103074_login.txt"
 //"USERS/103074/BIDDED"
 
 #define USERS_DIR "USERS/"
 #define AUCTIONS_DIR "AUCTIONS/"
+
+#define WRONG_FORMAT "ERR Wrong Format."
 
 #define DEFAULT 128
 #define MAX_FILE_LENGTH 30
@@ -39,6 +42,7 @@
 #define LOGOUT_UNR 2
 #define RMA_NLG 2
 #define RMB_NLG 2
+#define ROA_NLG 2
 
 #define LIN_SIZE 20
 #define LOU_SIZE 20
@@ -47,6 +51,7 @@
 #define LMB_SIZE 11
 #define LST_SIZE 4
 #define SRC_SIZE 8
+#define OPEN_SIZE 16 //103074 password 
 
 #define PORT "58011"
 
@@ -57,5 +62,4 @@ int udp_fd, tcp_fd, tcp_newfd, udp_n, tcp_n, udp_errcode, tcp_errcode;
 socklen_t udp_addrlen, tcp_addrlen;
 struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
-char buffer[MAX_MSG_LEN];
 pid_t child_pid;
