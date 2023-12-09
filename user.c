@@ -23,7 +23,7 @@ int udp_connect(char *message, int message_len) {
     hints.ai_family = AF_INET;      // IPv4
     hints.ai_socktype = SOCK_DGRAM; // UDP socket
 
-    errcode = getaddrinfo("127.0.0.1", PORT, &hints, &res);
+    errcode = getaddrinfo("193.136.138.142", PORT, &hints, &res);
     if (errcode != 0) /*error*/
         return -1;
     n = sendto(fd, message, message_len, 0, res->ai_addr, res->ai_addrlen);
@@ -56,6 +56,7 @@ void long_long_to_string(long long fsize, char *fsize_string){
     while(fsize > 0){
         fsize_string[num_car] = '0' + fsize%10;
         fsize = fsize / 10;
+        num_car--;
     }
 }
 
@@ -83,20 +84,17 @@ int send_file(int fd, char *filepath){
     if(write(fd, &space, sizeof(char)) == -1){
         return -1;
     }
-    
     write(1, &space, sizeof(char));
 
     if(write(fd, file_size_string, sizeof(file_size_string)) == -1){
         return -1;
     }
-    
     write(1, file_size_string, sizeof(file_size_string));
 
 
     if(write(fd, &space, sizeof(char)) == -1){
         return -1;
     }
-
     write(1, &space, sizeof(char));
 
     while((bytes_read = read(fd_file, data, BUFFER_SIZE)) != 0){
@@ -166,7 +164,7 @@ int tcp_connect(char *message, int message_len) {
 
     write(1, "sent: ", 6);
     write(1, message, message_len);
-    
+
     if(message[0] == 'O' && message[1] == 'P' && message[2] == 'A'){
         char filename[90] = {0};
         if (read_back_until(message, ' ', filename) == -1)
@@ -178,11 +176,13 @@ int tcp_connect(char *message, int message_len) {
         if (send_file(fd, filepath) == -1)
             return -1;  //error
     }
-    write(fd, &new_line, sizeof(char));
+    
     write(1, &new_line, sizeof(char));
+
 
     write(1, "ans: ", 5);
     write(1, buffer, n);
+    write(1, &new_line, sizeof(char));
 
     freeaddrinfo(res);
     close(fd);
