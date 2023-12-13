@@ -13,8 +13,8 @@
 #include <ctype.h>
 #include <time.h>
 
-//"USERS/103074/HOSTED/001.txt"
-//"AUCTIONS/001/bids/"
+//"USERS/103074/BIDDED/001.txt"
+//"AUCTIONS/001/bids/100000"
 // YYYY-MM-DD HH:MM:SS
 
 // Common strings to use
@@ -36,15 +36,16 @@
 
 #define AUCTION_ASSET_LENGTH 40
 #define AUCTION_START_LENGTH 27
-#define START_MAX_SIZE 82
-
 #define AUCTION_END_LENGHT 25
+#define BID_FILEPATH 25
+
+#define START_MAX_SIZE 82
 
 // Variables size
 #define USER_UID_SIZE 7
 #define PASS_SIZE 9
 #define AUCT_NAME 11
-#define START_VALUE 7
+#define VALUE 7
 #define TIME_ACTIVE 6
 #define ASSET_NAME 25
 #define AID 4
@@ -75,6 +76,10 @@
 #define RCL_EOW 4
 #define RCL_END 5
 
+#define RBD_NLG 2
+#define RBD_REF 3
+#define RBD_ILG 4
+
 // Fix size of answers
 #define LIN_SIZE 20
 #define LOU_SIZE 20
@@ -100,3 +105,10 @@ struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
 pid_t child_pid;
 int aid = 0;
+
+typedef struct auction{
+    int auction_id;
+    const char user_uid[USER_UID_SIZE];
+    int last_bid;
+    int is_active;
+} Auction;

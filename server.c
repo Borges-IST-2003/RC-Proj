@@ -38,6 +38,27 @@ void get_time(char* time_str, time_t* fulltime){
             current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
 }
 
+Auction get_auction(int _aid){
+    Auction auct;
+    DIR *bids;
+    char start_filepath[AUCTION_START_LENGTH] = {0};
+    char bids_dir;
+    struct dirent *entry;
+    char last_value[VALUE] = {0};
+
+    auct.auction_id = _aid;
+    sprintf(start_filepath, "%s%s/START_%03d.txt", AUCTIONS_DIR, _aid, _aid);
+    
+    while((entry = readdir(bids)) != NULL){
+        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        strcpy(last_value, entry->d_name);
+    }
+    auct.last_bid = atoi(last_value);
+
+    return auct;
+}
+
 // UDP functions
 
 // Creates the login file
@@ -573,9 +594,101 @@ int create_auction(char* user_uid, char* name, char* start_value, char* time_act
     return STATUS_OK;
 }
 
+int create_bid(const char* user_uid, const char* _aid, int* value){
+    FILE* file;
+    char* bid_filepath[BID_FILEPATH] = {0};
+    char* user_bid_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
+
+    sprintf(bid_filepath, "%s%s/BIDS/%d.txt", AUCTIONS_DIR, _aid, value);
+    sprintf(user_bid_filepath, "%s%s/BIDDED/%03d.txt", USERS_DIR, user_uid, _aid);
+
+    if((file = fopen(bid_filepath, "w")) == NULL){
+        printf("Error creating bid_filepath in create_bid().\n");
+        return ERR;
+    }
+
+    if(fclose(file) != 0){
+        printf("Error closing bid_file in AUCTIONS.\n");
+        return ERR;
+    }
+
+    if((file = fopen(user_bid_filepath, "w")) == NULL){
+        printf("Error creating user_bid_filepath in create_bid().\n");
+        return ERR;
+    }
+
+    if(fclose(file) != 0){
+        printf("Error closing user_bid_file.\n");
+        return ERR;
+    }
+
+    return STATUS_OK;
+}
+
 // Function BID
 int bid(const char* buffer){
-    return STATUS_OK;
+    DIR *bids;
+    struct dirent *entry;
+    char user_uid[USER_UID_SIZE] = {0};
+    char password[PASS_SIZE] = {0};
+    int _aid;
+    char str_value[VALUE] = {0};
+    int value;
+    char bid_filepath[BID_FILEPATH] = {0};
+
+    char auct_end_filepath[AUCTION_END_LENGHT] = {0};
+    char login_filepath[MAX_FILE_LENGTH] = {0};
+    char bids_dir[BIDS_DIR_SIZE] = {0};
+    char hosted_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
+    char last_value[VALUE] = {0};
+    int max_value = 0;
+    
+
+    if(sscanf(buffer, "%s %s %d %s\n", user_uid, password, _aid, str_value[VALUE]) != 4){
+        printf("Wrong format sent to bid() function.\n");
+        return ERR;
+    }
+
+    if(valid_uid(user_uid) != STATUS_OK){
+        printf("Wrong format user_uid in bid() function.\n");
+        return ERR;
+    }
+    if(valid_pass(password) != STATUS_OK){
+        printf("Wrong format password in bid() function.\n");
+        return ERR;
+    }
+    if(_aid < 1 || _aid > 999){
+        printf("Wrong format _aid in bid() function.\n");
+        return ERR;
+    }
+    if(strlen(str_value) < 1 || strlen(str_value) > 6){
+        printf("Wrong format value in bid() function.\n");
+        return ERR;
+    }
+
+    sprintf(auct_end_filepath, "%s%03d/END_%03d.txt", AUCTIONS_DIR, _aid, _aid);
+    if(access(auct_end_filepath, F_OK) != -1) return STATUS_NOK;
+    // # get the time and compare it.
+    sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid);
+    if(access(login_filepath, F_OK) == -1) return RBD_NLG;
+    sprintf(bids_dir, "%s%s/BIDS", AUCTIONS_DIR, _aid);
+    bids = opendir(bids_dir);
+    value = atoi(str_value);
+    while((entry = readdir(bids)) != NULL){
+        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        strcpy(last_value, entry->d_name);
+    }
+    if(last_value != NULL)
+        max_value = atoi(last_value);
+
+    if(max_value >= value)
+        return RBD_REF;
+
+    sprintf(hosted_filepath, "%s%s/HOSTED/%03d.txt", USERS_DIR, user_uid, _aid);
+    if(access(hosted_filepath, F_OK) != -1) return RBD_ILG;    
+
+    return create_bid(user_uid, _aid, value);
 }
 
 //Function OPA
@@ -583,7 +696,7 @@ int open_auction(const char* buffer, char* answer){
     char user_uid[USER_UID_SIZE] = {0};
     char password[PASS_SIZE] = {0};
     char name[AUCT_NAME] = {0};
-    char start_value[START_VALUE] = {0};
+    char start_value[VALUE] = {0};
     char time_active[TIME_ACTIVE] = {0};
     char asset_name[ASSET_NAME] = {0};
     char file_size_str[5] = {0};
@@ -601,7 +714,7 @@ int open_auction(const char* buffer, char* answer){
         printf("Error reading the name in open().\n");
         return ERR;
     }
-    if(read_next_word(start_value, START_VALUE) != STATUS_OK){
+    if(read_next_word(start_value, VALUE) != STATUS_OK){
         printf("Error on start_value in open().\n");
         return ERR;
     }
