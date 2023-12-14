@@ -28,35 +28,16 @@ int valid_uid(char* uid){
     return is_numeric(uid);
 }
 
-void get_time(char* time_str, time_t* fulltime){
+void get_time(time_t* fulltime, char* time_str){
     struct tm *current_time;
 
     time(fulltime);
-    current_time = gmtime(fulltime);
-    sprintf(time_str, "%4d-%02d-%02d %02d:%02d:%02d",
-            current_time->tm_year + 1900, current_time->tm_mon + 1, current_time->tm_mday,
-            current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
-}
-
-Auction get_auction(int _aid){
-    Auction auct;
-    DIR *bids;
-    char start_filepath[AUCTION_START_LENGTH] = {0};
-    char bids_dir;
-    struct dirent *entry;
-    char last_value[VALUE] = {0};
-
-    auct.auction_id = _aid;
-    sprintf(start_filepath, "%s%s/START_%03d.txt", AUCTIONS_DIR, _aid, _aid);
-    
-    while((entry = readdir(bids)) != NULL){
-        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            continue;
-        strcpy(last_value, entry->d_name);
+    if(time_str != NULL) {
+        current_time = gmtime(fulltime);
+        sprintf(time_str, "%4d-%02d-%02d %02d:%02d:%02d",
+                current_time->tm_year + 1900, current_time->tm_mon + 1, current_time->tm_mday,
+                current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
     }
-    auct.last_bid = atoi(last_value);
-
-    return auct;
 }
 
 // UDP functions
@@ -464,32 +445,32 @@ int list_auctions(char *answer) {
 
 // TCP functions
 
-int tcp_read(char* buffer, int len){ //jorge = bytes read
-    int jorge = 0;
+int tcp_read(char* buffer, int len){ //b_read = bytes read
+    int b_read = 0;
     while(len > 0){
-        jorge = read(tcp_newfd, buffer, len);
-        if(jorge == -1)
+        b_read = read(tcp_newfd, buffer, len);
+        if(b_read == -1)
             return ERR;
 
-        if(jorge == 0) //closed by peer
+        if(b_read == 0) //closed by peer
             break;
 
-        len -= jorge;
-        buffer += jorge;
+        len -= b_read;
+        buffer += b_read;
     }
 
     return STATUS_OK;
 }
 
-int tcp_write(char* buffer, int len){ //jorge = bytes written
-    int jorge = 0;
+int tcp_write(char* buffer, int len){ //b_written = bytes written
+    int b_written = 0;
     while(len > 0){
-        jorge = write(tcp_newfd, buffer, len);
-        if(jorge == -1){
+        b_written = write(tcp_newfd, buffer, len);
+        if(b_written == -1){
             return ERR;
         }
-        len -= jorge;
-        buffer += jorge;
+        len -= b_written;
+        buffer += b_written;
     }
     return STATUS_OK;
 }
@@ -501,7 +482,7 @@ int read_next_word(char *buffer, int max){
         if (tcp_read(&buffer[i], 1) == ERR)
             return ERR;
 
-        if(i >= max-2 || buffer[i] == ' ')
+        if(i >= max-1 || buffer[i] == ' ')
             break;
 
         if(buffer[i] == '\n' || buffer[i] == '\0')
@@ -550,7 +531,7 @@ int create_auction(char* user_uid, char* name, char* start_value, char* time_act
     char start_data[START_MAX_SIZE] = {0};
     char curr_time[CURR_TIME] = {0};
     time_t fulltime;
-    get_time(curr_time, &fulltime);
+    get_time(&fulltime, curr_time);
     sprintf(start_data, "%s %s %s %s %s %s %ld", user_uid, name, start_value, time_active, asset_name, curr_time, fulltime);
     if((file = fopen(auction_start_filepath, "w")) == NULL){
         printf("Error creating start.txt file.\n");
@@ -594,12 +575,13 @@ int create_auction(char* user_uid, char* name, char* start_value, char* time_act
     return STATUS_OK;
 }
 
-int create_bid(const char* user_uid, const char* _aid, int* value){
+// Sub function from bid() (BID)
+int create_bid(const char* user_uid, int _aid, int value){
     FILE* file;
-    char* bid_filepath[BID_FILEPATH] = {0};
-    char* user_bid_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
+    char bid_filepath[BID_FILEPATH] = {0};
+    char user_bid_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
 
-    sprintf(bid_filepath, "%s%s/BIDS/%d.txt", AUCTIONS_DIR, _aid, value);
+    sprintf(bid_filepath, "%s%03d/BIDS/%d.txt", AUCTIONS_DIR, _aid, value);
     sprintf(user_bid_filepath, "%s%s/BIDDED/%03d.txt", USERS_DIR, user_uid, _aid);
 
     if((file = fopen(bid_filepath, "w")) == NULL){
@@ -625,26 +607,64 @@ int create_bid(const char* user_uid, const char* _aid, int* value){
     return STATUS_OK;
 }
 
+
+int get_auction(int _aid, Auction* auct){
+    DIR* bids;
+    FILE* file;
+    char auct_end_filepath[AUCTION_END_LENGHT] = {0};
+    char start_filepath[AUCTION_START_LENGTH] = {0};
+    char bids_dir[BIDS_DIR_SIZE] = {0};
+    struct dirent *entry;
+    char last_value[VALUE] = {0};
+    
+    time_t fulltime;
+    char buffer[DEFAULT] = {0};
+
+    auct->auction_id = _aid;
+    auct->is_active = true;
+
+    sprintf(auct_end_filepath, "%s%03d/END_%03d.txt", AUCTIONS_DIR, _aid, _aid);
+    if(access(auct_end_filepath, F_OK) != -1) auct->is_active = false;
+
+    sprintf(start_filepath, "%s%03d/START_%03d.txt", AUCTIONS_DIR, _aid, _aid);
+    if((file = fopen(start_filepath, "r")) == NULL)
+        return ERR;
+    while(fread(buffer, sizeof(char), sizeof(buffer), file) > 0);
+    if(fclose(file) != 0)
+        return ERR;
+
+    if(sscanf(buffer, "%s %*s %*s %*s %d %*s %d", auct->user_uid, &auct->time_active, &auct->fulltime) != 3)
+        return ERR;
+
+    get_time(&fulltime, NULL);
+    if(((fulltime - auct->fulltime) / 60) >= auct->time_active) {           // Seconds / 60 (to get minutes)
+        auct->is_active = false; 
+        create_end_file(_aid);
+    }
+
+    sprintf(bids_dir, "%s%03d/BIDS", AUCTIONS_DIR, _aid);
+    bids = opendir(bids_dir);
+    while((entry = readdir(bids)) != NULL){
+        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        strcpy(last_value, entry->d_name);
+    }
+    auct->last_bid = atoi(last_value);
+
+    return STATUS_OK;
+}
+
 // Function BID
 int bid(const char* buffer){
-    DIR *bids;
-    struct dirent *entry;
     char user_uid[USER_UID_SIZE] = {0};
     char password[PASS_SIZE] = {0};
     int _aid;
-    char str_value[VALUE] = {0};
     int value;
-    char bid_filepath[BID_FILEPATH] = {0};
 
-    char auct_end_filepath[AUCTION_END_LENGHT] = {0};
     char login_filepath[MAX_FILE_LENGTH] = {0};
-    char bids_dir[BIDS_DIR_SIZE] = {0};
     char hosted_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
-    char last_value[VALUE] = {0};
-    int max_value = 0;
-    
 
-    if(sscanf(buffer, "%s %s %d %s\n", user_uid, password, _aid, str_value[VALUE]) != 4){
+    if(sscanf(buffer, "%s %s %d %d\n", user_uid, password, &_aid, &value) != 4){
         printf("Wrong format sent to bid() function.\n");
         return ERR;
     }
@@ -661,28 +681,20 @@ int bid(const char* buffer){
         printf("Wrong format _aid in bid() function.\n");
         return ERR;
     }
-    if(strlen(str_value) < 1 || strlen(str_value) > 6){
+    if( value < 1 || value > 999999){
         printf("Wrong format value in bid() function.\n");
         return ERR;
     }
 
-    sprintf(auct_end_filepath, "%s%03d/END_%03d.txt", AUCTIONS_DIR, _aid, _aid);
-    if(access(auct_end_filepath, F_OK) != -1) return STATUS_NOK;
-    // # get the time and compare it.
+    Auction auct;
+    get_auction(_aid, &auct);
+
+    if(auct.is_active)
+
     sprintf(login_filepath, "%s%s/%s_login.txt", USERS_DIR, user_uid, user_uid);
     if(access(login_filepath, F_OK) == -1) return RBD_NLG;
-    sprintf(bids_dir, "%s%s/BIDS", AUCTIONS_DIR, _aid);
-    bids = opendir(bids_dir);
-    value = atoi(str_value);
-    while((entry = readdir(bids)) != NULL){
-        if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            continue;
-        strcpy(last_value, entry->d_name);
-    }
-    if(last_value != NULL)
-        max_value = atoi(last_value);
 
-    if(max_value >= value)
+    if(auct.last_bid >= value)
         return RBD_REF;
 
     sprintf(hosted_filepath, "%s%s/HOSTED/%03d.txt", USERS_DIR, user_uid, _aid);
@@ -731,6 +743,7 @@ int open_auction(const char* buffer, char* answer){
         printf("Error reading the file_size in open().\n");
         return ERR;
     }
+    printf("%s %s %s %s %s\n", name, start_value, time_active, asset_name, file_size_str);
     if((file_size = atoi(file_size_str)) == 0){
         printf("A non valid integer read in file_size_str.\n");
         return ERR;

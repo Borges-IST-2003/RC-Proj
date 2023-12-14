@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <time.h>
+#include <stdbool.h>
 
 //"USERS/103074/BIDDED/001.txt"
 //"AUCTIONS/001/bids/100000"
@@ -108,7 +109,9 @@ int aid = 0;
 
 typedef struct auction{
     int auction_id;
-    const char user_uid[USER_UID_SIZE];
+    char user_uid[USER_UID_SIZE];
     int last_bid;
-    int is_active;
+    bool is_active;
+    int fulltime;
+    int time_active;
 } Auction;
