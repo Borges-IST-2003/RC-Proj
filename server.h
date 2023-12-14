@@ -41,6 +41,7 @@
 #define BID_FILEPATH 25
 
 #define START_MAX_SIZE 82
+#define END_MAX_SIZE 26
 
 // Variables size
 #define USER_UID_SIZE 7
