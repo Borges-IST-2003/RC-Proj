@@ -92,7 +92,7 @@
 #define SRC_SIZE 8
 #define OPEN_SIZE 16        //103074 password 
 #define CLOSE_SIZE 20       //103074 password 001
-#define BID_SIZE 26         //103074 password 001 50000
+#define BID_SIZE 20         //103074 password 001
 
 // Port
 #define PORT "58011"
@@ -106,7 +106,7 @@ socklen_t udp_addrlen, tcp_addrlen;
 struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
 pid_t child_pid;
-int aid = 0;
+int aid;
 
 typedef struct auction{
     int auction_id;

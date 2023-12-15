@@ -1,6 +1,26 @@
 #include "server.h"
 
 // Aux functions
+
+void get_aid(){
+    DIR* dir;
+    struct dirent* entry;
+    char auction_id[AID] = {0};
+    
+    dir = opendir(AUCTIONS_DIR);
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        memset(auction_id, 0, strlen(auction_id));
+        strncpy(auction_id, entry->d_name, AID-1);
+    }
+
+    if((aid = atoi(auction_id)) != 0 )
+        return;
+    aid = 0;
+
+}
+
 int is_alphanum(char* str){
     while (*str) {
         if (!isalnum(*str))
@@ -248,13 +268,13 @@ int user_create(const char *login_filepath, const char *pass_filepath, const cha
 int user_delete(const char *pass_filepath, const char *login_filepath) {
     // Removes the password file
     if (remove(pass_filepath) != 0) {
-        perror("Error removing password file");
+        printf("Error removing password file");
         return ERR;
     }
 
     // Remove the login file
     if (remove(login_filepath) != 0) {
-        perror("Error removing login file");
+        printf("Error removing login file");
         return ERR;
     }
 
@@ -330,7 +350,7 @@ int user_logout(const char *buffer) {
     if((check_pass_result = check_password(password, pass_filepath)) == STATUS_OK){
         // Remove the login file
         if (remove(login_filepath) != 0) {
-            perror("Error removing login file");
+            printf("Error removing login file");
             return ERR;
         }
         return STATUS_OK;
@@ -401,7 +421,7 @@ int list_user_auctions(const char *buffer, char *answer) {
 
     // Open the directory
     if ((dir = opendir(hosted_dir)) == NULL) {
-        perror("Error opening directory");
+        printf("Error opening directory");
         return ERR;
     }
 
@@ -456,7 +476,7 @@ int list_user_bids(const char *buffer, char *answer) {
 
     // Open the directory
     if ((dir = opendir(bidded_dir)) == NULL) {
-        perror("Error opening directory");
+        printf("Error opening directory");
         return ERR;
     }
 
@@ -496,9 +516,8 @@ int list_auctions(char *answer) {
     char _aid[AID] = {0};
 
     // Open the directory
-    dir = opendir(AUCTIONS_DIR);
-    if (dir == NULL) {
-        perror("Error opening directory");
+    if ((dir = opendir(AUCTIONS_DIR)) == NULL) {
+        printf("Error opening directory");
         return ERR;
     }
 
@@ -533,7 +552,11 @@ int list_auctions(char *answer) {
 // Function SRC()
 int show_record(const char* buffer, char* answer) {
     int _aid;
-    //char start_filepath[AUCTION_START_LENGTH] = {0};
+    Auction auct;
+    FILE* file;
+    DIR* dir;
+    struct dirent* entry;
+    char aux_buff[DEFAULT] = {0};
 
     if(sscanf(buffer, "%*s %d", &_aid) != 1) {
         printf("Error reading the _aid from buffer.\n");
@@ -544,6 +567,96 @@ int show_record(const char* buffer, char* answer) {
         return ERR;
     }
     
+    switch(get_auction(_aid, &auct)){
+        case STATUS_NOK:
+            return STATUS_NOK;
+        case ERR:
+            return ERR;
+        default:
+            break;
+    }
+
+    strcat(answer, "RRC OK ");
+
+    // AUCTIONS/(aid)/START_(aid).txt
+    char start_filepath[AUCTION_START_LENGTH] = {0};
+    sprintf(start_filepath, "%s%03d/START_%03d.txt", AUCTIONS_DIR, auct.auction_id, auct.auction_id);
+    
+    // Start file information
+    if((file = fopen(start_filepath, "r")) == NULL){
+        printf("Error opening the %s file in SRC.\n", start_filepath);
+        return ERR;
+    }
+
+    if(fscanf(file, "%s", aux_buff) != 1){
+        printf("Error reading from the %s file.\n", start_filepath);
+        return ERR;
+    }
+
+    if(fclose(file) != 0){
+        printf("Error closing the %s file.\n", start_filepath);
+        return ERR;
+    }
+
+    strcat(answer, aux_buff);
+    strcat(answer, "\n");
+
+    // AUCTIONS/(aid)/BIDS
+    char bids_dir[BIDS_DIR_SIZE] = {0};
+    sprintf(bids_dir, "%s%03d/BIDS", AUCTIONS_DIR, auct.auction_id);
+
+    // Getting all Bids
+    if ((dir = opendir(AUCTIONS_DIR)) == NULL) {
+        printf("Error opening directory");
+        return ERR;
+    }
+    rewinddir(dir);                                         // Reset the directory stream
+
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+        memset(aux_buff, 0, strlen(aux_buff));
+        if((file = fopen(entry->d_name, "r")) == NULL){
+            printf("Error opening the %s file in SRC.\n", entry->d_name);
+            return ERR;
+        }
+        if(fscanf(file, "%s", aux_buff) != 1){
+            printf("Error reading from the %s file.\n", entry->d_name);
+            return ERR;
+        }
+        if(fclose(file) != 0){
+            printf("Error closing the %s file.\n", entry->d_name);
+            return ERR;
+        }
+        strcat(answer, aux_buff);
+        strcat(answer, "\n");
+    }
+
+    // Close the directory
+    closedir(dir);
+
+    // AUCTIONS/(aid)/END_(aid).txt
+    char end_filepath[AUCTION_END_LENGHT] = {0};
+    sprintf(end_filepath, "%s%03d/END_%03d.txt", AUCTIONS_DIR, auct.auction_id, auct.auction_id);
+    memset(aux_buff, 0, strlen(aux_buff));
+
+    // End file information
+    if((file = fopen(end_filepath, "r")) == NULL){
+        printf("Error opening the %s file in SRC.\n", end_filepath);
+        return ERR;
+    }
+    if(fscanf(file, "%s", aux_buff) != 1){
+        printf("Error reading from the %s file.\n", end_filepath);
+        return ERR;
+    }
+    if(fclose(file) != 0){
+        printf("Error closing the %s file.\n", end_filepath);
+        return ERR;
+    }
+
+    strcat(answer, aux_buff);
+    strcat(answer, "\n");
+    printf("ola");
     return STATUS_OK;
 }
 
@@ -601,17 +714,19 @@ int read_next_word(char *buffer, int max){
 // Sub function from open() (OPA)
 int create_auction(char* user_uid, char* name, char* start_value, char* time_active, char* asset_name, char* asset_data){
     // Creating the directories
-    // Dir's to be created
     char auction_dir[AUCTIONS_DIR_SIZE] = {0};
     char asset_dir[ASSET_DIR_SIZE] = {0};
     char bids_dir[BIDS_DIR_SIZE] = {0};
 
-    aid++;
+    aid += 1;
     sprintf(auction_dir, "%s%03d", AUCTIONS_DIR, aid);
     sprintf(asset_dir, "%s/ASSET", auction_dir);
     sprintf(bids_dir, "%s/BIDS", auction_dir);
 
     if(mkdir(auction_dir, 0777) != 0){
+        if (errno == EEXIST) {
+            printf("Directory '%s' already exists.\n", auction_dir);
+        }
         printf("Error creating the auction directory.\n");
         return ERR;
     }
@@ -709,7 +824,7 @@ int create_bid(const char* user_uid, int _aid, int value){
     }
 
     if(create_file(user_bid_filepath) != STATUS_OK) return ERR;
-
+    printf("Ending create_bid.\n");
     return STATUS_OK;
 }
 
@@ -718,15 +833,22 @@ int bid(const char* buffer) {
     char user_uid[USER_UID_SIZE] = {0};
     char password[PASS_SIZE] = {0};
     int _aid;
+    char str_value[VALUE] = {0};
     int value;
 
     char login_filepath[MAX_FILE_LENGTH] = {0};
     char hosted_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
 
-    if(sscanf(buffer, "%s %s %d %d\n", user_uid, password, &_aid, &value) != 4){
+    printf("buffer to bid: |%s|\n", buffer);
+    if(sscanf(buffer, "%s %s %d\n", user_uid, password, &_aid) != 3){
         printf("Wrong format sent to bid() function.\n");
         return ERR;
     }
+    if(read_next_word(str_value, VALUE) == ERR){
+        printf("Error reading the value to bid.\n");
+        return ERR;
+    }
+    value = atoi(str_value);
 
     if(valid_uid(user_uid) != STATUS_OK){
         printf("Wrong format user_uid in bid() function.\n");
@@ -745,6 +867,7 @@ int bid(const char* buffer) {
         return ERR;
     }
 
+    printf("Getting auction.\n");
     Auction auct;
     get_auction(_aid, &auct);
 
@@ -844,7 +967,7 @@ int open_auction(const char* buffer, char* answer){
         result = create_auction(user_uid, name, start_value, time_active, asset_name, asset_data);
         free(asset_data);
         if(result == STATUS_OK)
-            sprintf(answer, "ROA OK %d", aid);
+            sprintf(answer, "ROA OK %03d", aid);
         return result;
     }
     free(asset_data);
@@ -1128,15 +1251,24 @@ void tcp_handler(int tcp_newfd){
             exit(1);
         switch (bid(buffer)) {
             case STATUS_OK:
-                strcpy(answer, "RBD OK");
+                strcpy(answer, "RBD ACC");
                 break;
-
-
+            case STATUS_NOK:
+                strcpy(answer, "RBD NOK");
+                break;
+            case RBD_NLG:
+                strcpy(answer, "RBD NLG");
+                break;
+            case RBD_REF:
+                strcpy(answer, "RBD REF");
+                break;
+            case RBD_ILG:
+                strcpy(answer, "RBD ILG");
+                break;
             default:
                 strcpy(answer, "RBD ERR");
                 break;
         }
-        return;
     }
     else{
         strcpy(answer, "Invalid operand.\n");
@@ -1151,7 +1283,7 @@ void tcp_handler(int tcp_newfd){
     return;
 }
 
-int main(){
+int main() {
     // UDP setup
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd == -1)
@@ -1188,6 +1320,7 @@ int main(){
 
     // Main Loop
     while (1) {
+        get_aid();
         fd_set read_fds;
         FD_ZERO(&read_fds);
         FD_SET(tcp_fd, &read_fds);
