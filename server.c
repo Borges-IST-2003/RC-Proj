@@ -61,6 +61,16 @@ void get_time(time_t* fulltime, char* time_str){
     }
 }
 
+int CheckAssetFile(char* fname) {
+    struct stat filestat;
+    int ret_stat;
+    ret_stat = stat(fname, &filestat);
+    if(ret_stat == -1 || filestat.st_size == 0)
+        return 0;
+
+    return (filestat.st_size);
+}
+
 int create_file(const char* filepath){
     FILE* file;
     if((file = fopen(filepath, "w")) == NULL){
@@ -588,7 +598,7 @@ int show_record(const char* buffer, char* answer) {
         return ERR;
     }
 
-    if(fscanf(file, "%s", aux_buff) != 1){
+    if(fgets(aux_buff, DEFAULT, file) == NULL){
         printf("Error reading from the %s file.\n", start_filepath);
         return ERR;
     }
@@ -599,14 +609,14 @@ int show_record(const char* buffer, char* answer) {
     }
 
     strcat(answer, aux_buff);
-    strcat(answer, "\n");
 
     // AUCTIONS/(aid)/BIDS
     char bids_dir[BIDS_DIR_SIZE] = {0};
+    char bid_file[BID_FILEPATH] = {0};
     sprintf(bids_dir, "%s%03d/BIDS", AUCTIONS_DIR, auct.auction_id);
 
     // Getting all Bids
-    if ((dir = opendir(AUCTIONS_DIR)) == NULL) {
+    if ((dir = opendir(bids_dir)) == NULL) {
         printf("Error opening directory");
         return ERR;
     }
@@ -616,11 +626,13 @@ int show_record(const char* buffer, char* answer) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
         memset(aux_buff, 0, strlen(aux_buff));
-        if((file = fopen(entry->d_name, "r")) == NULL){
-            printf("Error opening the %s file in SRC.\n", entry->d_name);
+        memset(bid_file, 0, strlen(bid_file));
+        sprintf(bid_file, "%s/%s", bids_dir, entry->d_name);
+        if((file = fopen(bid_file, "r")) == NULL){
+            printf("Error opening the %s file in SRC.\n", bid_file);
             return ERR;
         }
-        if(fscanf(file, "%s", aux_buff) != 1){
+        if(fgets(aux_buff, DEFAULT, file) == NULL){
             printf("Error reading from the %s file.\n", entry->d_name);
             return ERR;
         }
@@ -628,12 +640,16 @@ int show_record(const char* buffer, char* answer) {
             printf("Error closing the %s file.\n", entry->d_name);
             return ERR;
         }
+        strcat(answer, "\nB ");
         strcat(answer, aux_buff);
-        strcat(answer, "\n");
     }
 
     // Close the directory
     closedir(dir);
+
+    if(auct.is_active){
+        return STATUS_OK; 
+    }
 
     // AUCTIONS/(aid)/END_(aid).txt
     char end_filepath[AUCTION_END_LENGHT] = {0};
@@ -645,7 +661,7 @@ int show_record(const char* buffer, char* answer) {
         printf("Error opening the %s file in SRC.\n", end_filepath);
         return ERR;
     }
-    if(fscanf(file, "%s", aux_buff) != 1){
+    if(fgets(aux_buff, DEFAULT, file) == NULL){
         printf("Error reading from the %s file.\n", end_filepath);
         return ERR;
     }
@@ -654,9 +670,8 @@ int show_record(const char* buffer, char* answer) {
         return ERR;
     }
 
+    strcat(answer, "\nE ");
     strcat(answer, aux_buff);
-    strcat(answer, "\n");
-    printf("ola");
     return STATUS_OK;
 }
 
@@ -751,7 +766,7 @@ int create_auction(char* user_uid, char* name, char* start_value, char* time_act
     char curr_time[CURR_TIME] = {0};
     time_t fulltime;
     get_time(&fulltime, curr_time);
-    sprintf(start_data, "%s %s %s %s %s %s %ld", user_uid, name, start_value, time_active, asset_name, curr_time, fulltime);
+    sprintf(start_data, "%s %s %s %s %s %s %ld", user_uid, name, asset_name, start_value, time_active, curr_time, fulltime);
     if((file = fopen(auction_start_filepath, "w")) == NULL){
         printf("Error creating start.txt file.\n");
         return ERR;
@@ -934,7 +949,6 @@ int open_auction(const char* buffer, char* answer){
         return ERR;
     }
 
-    printf("%s %s %s %s %s\n", name, start_value, time_active, asset_name, file_size_str);      // Apagar
     if((file_size = atoi(file_size_str)) == 0){
         printf("A non valid integer read in file_size_str.\n");
         return ERR;
@@ -1027,6 +1041,39 @@ int close_auction(const char* buffer){
     return create_end_file(_aid, curr_time, (fulltime - auct.fulltime));
 }
 
+// Function SAS
+int show_asset(const char* buffer, char* answer){
+    int _aid;
+    char start_filepath[AUCTION_START_LENGTH] = {0};
+    char asset_filepath[AUCTION_ASSET_LENGTH] = {0};
+    char asset_name[AUCT_NAME] = {0};
+    char asset_data[DATA] = {0};
+    int fsize;
+    FILE* file;
+
+    if(sscanf(buffer, "%d", &_aid) != 1) return STATUS_NOK;
+    printf("ola\n");
+    sprintf(start_filepath, "%s%03d/START_%03d.txt", AUCTIONS_DIR, _aid, _aid);
+    printf("ola\n");
+    if((file = fopen(start_filepath, "r")) == NULL) return STATUS_NOK;
+    if(fscanf(file, "%*s %*s %s", asset_name) != 1) return STATUS_NOK;
+    if(fclose(file) != 0) return STATUS_NOK;
+    printf("ola\n");
+    fsize = CheckAssetFile(asset_filepath);
+    printf("ola\n");
+    sprintf(asset_filepath, "%s%03d/ASSET/%s", AUCTIONS_DIR, _aid, asset_name);
+    
+    if((file = fopen(asset_filepath, "r")) == NULL) return STATUS_NOK;
+    printf("ola\n");
+    while(fread(asset_data, fsize, sizeof(char), file) > 0);
+    printf("ola\n");
+    if(fclose(file) != 0) return STATUS_NOK;
+    printf("ola\n");
+    if(tcp_write(asset_data, fsize) != STATUS_OK) return STATUS_NOK;
+    return STATUS_OK;
+}
+
+// Main/Connection functions
 int max(int a, int b){
     return (a > b ? a : b);
 }
@@ -1244,7 +1291,15 @@ void tcp_handler(int tcp_newfd){
         }
     }
     else if(strcmp(message_code, "SAS ") == 0){
-        return;
+        if(tcp_read(buffer, SAS_SIZE) == ERR)
+            exit(1);
+        switch (show_asset(buffer, answer)) {
+            case STATUS_OK:
+                break;
+            default:
+                sprintf(answer, "RSA ERR");
+                break;
+        }
     }
     else if(strcmp(message_code, "BID ") == 0){
         if(tcp_read(buffer, BID_SIZE) == ERR)

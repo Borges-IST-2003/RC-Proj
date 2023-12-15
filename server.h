@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <stdbool.h>
+#include <sys/stat.h>
 
 //"USERS/103074/BIDDED/001.txt"
 //"AUCTIONS/001/bids/100000"
@@ -93,12 +94,14 @@
 #define OPEN_SIZE 16        //103074 password 
 #define CLOSE_SIZE 20       //103074 password 001
 #define BID_SIZE 20         //103074 password 001
+#define SAS_SIZE 4          //AID
 
 // Port
 #define PORT "58011"
 
 // Main function conventions
 #define MAX_MSG_LEN 6002
+#define DATA 1000000
 #define CODE_SIZE 4
 
 int udp_fd, tcp_fd, tcp_newfd, udp_n, tcp_n, udp_errcode, tcp_errcode;
