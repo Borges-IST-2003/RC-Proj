@@ -14,6 +14,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <stdarg.h>
 
 //"USERS/103074/BIDDED/001.txt"
 //"AUCTIONS/001/bids/100000"
@@ -39,7 +40,7 @@
 #define AUCTION_ASSET_LENGTH 40
 #define AUCTION_START_LENGTH 27
 #define AUCTION_END_LENGHT 25
-#define BID_FILEPATH 25
+#define BID_FILEPATH 26
 
 #define START_MAX_SIZE 82
 #define END_MAX_SIZE 26
@@ -97,7 +98,8 @@
 #define SAS_SIZE 4          //AID
 
 // Port
-#define PORT "58011"
+#define PORT "58077"
+#define PORT_SIZE 6
 
 // Main function conventions
 #define MAX_MSG_LEN 6002
@@ -109,7 +111,7 @@ socklen_t udp_addrlen, tcp_addrlen;
 struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
 pid_t child_pid;
-int aid;
+int aid, v = 0;
 
 typedef struct auction{
     int auction_id;

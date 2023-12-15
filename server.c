@@ -1,6 +1,15 @@
 #include "server.h"
 
 // Aux functions
+void print(const char *format, ...) {
+    // Check if command-line arguments are present
+    if (v == 1) {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+    }
+}
 
 void get_aid(){
     DIR* dir;
@@ -61,25 +70,26 @@ void get_time(time_t* fulltime, char* time_str){
     }
 }
 
-int CheckAssetFile(char* fname) {
+int CheckAssetFile(const char* fname) {
     struct stat filestat;
-    int ret_stat;
-    ret_stat = stat(fname, &filestat);
-    if(ret_stat == -1 || filestat.st_size == 0)
-        return 0;
+    if (stat(fname, &filestat) == -1) {
+        perror("Error checking file status");
+        return -1;
+    }
 
-    return (filestat.st_size);
+    return filestat.st_size;
 }
+
 
 int create_file(const char* filepath){
     FILE* file;
     if((file = fopen(filepath, "w")) == NULL){
-        printf("Error creating file %s.\n", filepath);
+        print("Error creating file %s.\n", filepath);
         return ERR;
     }
 
     if(fclose(file) != 0){
-        printf("Error closing file %s.\n", filepath);
+        print("Error closing file %s.\n", filepath);
         return ERR;
     }
 
@@ -92,18 +102,18 @@ int create_end_file(int _aid, const char* end_datetime, int end_sec_time){
     char end_buffer[DEFAULT] = {0};
 
     sprintf(auction_end_filepath, "%s%03d/END_%03d.txt", AUCTIONS_DIR, _aid, _aid);
-    printf("%s\n", auction_end_filepath);
+    print("%s\n", auction_end_filepath);
     sprintf(end_buffer, "%s %d", end_datetime, end_sec_time);
     if((file = fopen(auction_end_filepath, "w")) == NULL){
-        printf("Error creating END.txt file.\n");
+        print("Error creating END.txt file.\n");
         return ERR;
     }
     if(fprintf(file, "%s", end_buffer) != strlen(end_buffer)){
-        printf("Error writing in END.txt file.\n");
+        print("Error writing in END.txt file.\n");
         return ERR;
     }
     if(fclose(file) != 0){
-        printf("Error closing the END.txt file.\n");
+        print("Error closing the END.txt file.\n");
         return ERR;
     }
 
@@ -137,17 +147,17 @@ int get_auction(int _aid, Auction* auct){
     if(access(auct_end_filepath, F_OK) != -1) auct->is_active = false;
 
     if((file = fopen(start_filepath, "r")) == NULL){
-        printf("Error opening the start.txt file.\n");
+        print("Error opening the start.txt file.\n");
         return ERR;
     }
     fread(buffer, sizeof(char), sizeof(buffer), file);
     if(fclose(file) != 0){
-        printf("Error closing the start.txt file.\n");
+        print("Error closing the start.txt file.\n");
         return ERR;
     }
 
     if(sscanf(buffer, "%s %*s %*s %d %*s %*d-%*d-%*d %*d:%*d:%*d %d", auct->user_uid, &auct->time_active, &auct->fulltime) != 3){
-        printf("Error getting information from the start file.\n");
+        print("Error getting information from the start file.\n");
         return ERR;
     }
 
@@ -177,17 +187,17 @@ int create_login(const char* user_uid, const char* login_filepath){
     FILE *file;
 
     if((file = fopen(login_filepath, "w")) == NULL){
-        printf("Error creating login file.\n");
+        print("Error creating login file.\n");
         return ERR;
     }
 
     if(fprintf(file, "%s", user_uid) != USER_UID_SIZE - 1){
-        printf("Error writing on login file.\n");
+        print("Error writing on login file.\n");
         return ERR;
     }
 
     if (fclose(file) != 0) {
-        printf("Error closing login file.\n");
+        print("Error closing login file.\n");
         return ERR;
     }
     return STATUS_OK;                               // returns 0
@@ -199,15 +209,15 @@ int check_password(const char* password, const char* pass_filepath){
     char pass[PASS_SIZE] = {0};                     // pass read from the file '_pass.txt'
 
     if((file = fopen(pass_filepath, "r")) == NULL){
-        printf("Error opening the pass file.\n");
+        print("Error opening the pass file.\n");
         return ERR;
     }
     if(fread(pass, sizeof(char), PASS_SIZE-1, file) != PASS_SIZE-1){
-        printf("Error reading the pass file.\n");
+        print("Error reading the pass file.\n");
         return ERR;
     }
     if(fclose(file) != 0){
-        printf("Error closing pass file.\n");
+        print("Error closing pass file.\n");
         return ERR;
     }
     if(strcmp(pass, password) != 0)
@@ -231,7 +241,7 @@ int user_create(const char *login_filepath, const char *pass_filepath, const cha
     // Creates the directory of the user (eg. USERS/'103074'/)
     if (mkdir(user_dir, 0777) != 0) {
         if (errno != EEXIST) {
-            printf("Error creating user directory.\n");
+            print("Error creating user directory.\n");
             return ERR;
         }
     }
@@ -239,7 +249,7 @@ int user_create(const char *login_filepath, const char *pass_filepath, const cha
     // Creates the hosted sub-directory of the user (eg. USERS/103074/'HOSTED')
     if (mkdir(user_hosted_dir, 0777) != 0) {
         if (errno != EEXIST) {
-            printf("Error creating user directory.\n");
+            print("Error creating user directory.\n");
             return ERR;
         }
     }
@@ -247,24 +257,24 @@ int user_create(const char *login_filepath, const char *pass_filepath, const cha
     // Creates the bidded sub-directory of the user (eg. USERS/103074/'BIDDED')
     if (mkdir(user_bidded_dir, 0777) != 0) {
         if (errno != EEXIST) {
-            printf("Error creating user directory.\n");
+            print("Error creating user directory.\n");
             return ERR;
         }
     }
 
     // Creates password file. (eg. USERS/103074/'103074_pass.txt')
     if((file = fopen(pass_filepath, "w")) == NULL){
-        printf("Error creating pass file.\n");
+        print("Error creating pass file.\n");
         return ERR;
     }
 
     if(fprintf(file, "%s", password) != PASS_SIZE - 1){
-        printf("Error writing on pass file.\n");
+        print("Error writing on pass file.\n");
         return ERR;
     }
 
     if (fclose(file) != 0) {
-        printf("Error closing pass file.\n");
+        print("Error closing pass file.\n");
         return ERR;
     }
 
@@ -278,13 +288,13 @@ int user_create(const char *login_filepath, const char *pass_filepath, const cha
 int user_delete(const char *pass_filepath, const char *login_filepath) {
     // Removes the password file
     if (remove(pass_filepath) != 0) {
-        printf("Error removing password file");
+        print("Error removing password file");
         return ERR;
     }
 
     // Remove the login file
     if (remove(login_filepath) != 0) {
-        printf("Error removing login file");
+        print("Error removing login file");
         return ERR;
     }
 
@@ -303,12 +313,12 @@ int user_login(const char *buffer){
     sscanf(buffer + CODE_SIZE, "%s %s\n", user_uid, password);
     // Checks password format
     if(valid_pass(password) == ERR){
-        printf("Wrong password format.\n");
+        print("Wrong password format.\n");
         return ERR;
     }
     // Checks user_uid format
     if(valid_uid(user_uid) == ERR){
-        printf("Wrong user id format.\n");
+        print("Wrong user id format.\n");
         return ERR;
     }
     
@@ -338,13 +348,13 @@ int user_logout(const char *buffer) {
 
     // Checks password format
     if(valid_pass(password) == ERR){
-        printf("Wrong password format.\n");
+        print("Wrong password format.\n");
         return ERR;
     }
 
     // Checks user_uid format
     if(valid_uid(user_uid) == ERR){
-        printf("Wrong user id format.\n");
+        print("Wrong user id format.\n");
         return ERR;
     }
 
@@ -360,7 +370,7 @@ int user_logout(const char *buffer) {
     if((check_pass_result = check_password(password, pass_filepath)) == STATUS_OK){
         // Remove the login file
         if (remove(login_filepath) != 0) {
-            printf("Error removing login file");
+            print("Error removing login file");
             return ERR;
         }
         return STATUS_OK;
@@ -382,12 +392,12 @@ int user_unregister(const char *buffer) {
 
     // Checks password format
     if(valid_pass(password) == ERR){
-        printf("Wrong password format.\n");
+        print("Wrong password format.\n");
         return ERR;
     }
     // Checks user_uid format
     if(valid_uid(user_uid) == ERR){
-        printf("Wrong user id format.\n");
+        print("Wrong user id format.\n");
         return ERR;
     }
 
@@ -419,7 +429,7 @@ int list_user_auctions(const char *buffer, char *answer) {
 
     // Checks user_uid format
     if(valid_uid(user_uid) == ERR){
-        printf("Wrong user id format.\n");
+        print("Wrong user id format.\n");
         return ERR;
     }
 
@@ -431,7 +441,7 @@ int list_user_auctions(const char *buffer, char *answer) {
 
     // Open the directory
     if ((dir = opendir(hosted_dir)) == NULL) {
-        printf("Error opening directory");
+        print("Error opening directory");
         return ERR;
     }
 
@@ -475,7 +485,7 @@ int list_user_bids(const char *buffer, char *answer) {
 
     // Checks user_uid format
     if(valid_uid(user_uid) == ERR){
-        printf("Wrong user id format.\n");
+        print("Wrong user id format.\n");
         return ERR;
     }
 
@@ -486,7 +496,7 @@ int list_user_bids(const char *buffer, char *answer) {
 
     // Open the directory
     if ((dir = opendir(bidded_dir)) == NULL) {
-        printf("Error opening directory");
+        print("Error opening directory");
         return ERR;
     }
 
@@ -527,7 +537,7 @@ int list_auctions(char *answer) {
 
     // Open the directory
     if ((dir = opendir(AUCTIONS_DIR)) == NULL) {
-        printf("Error opening directory");
+        print("Error opening directory");
         return ERR;
     }
 
@@ -566,14 +576,15 @@ int show_record(const char* buffer, char* answer) {
     FILE* file;
     DIR* dir;
     struct dirent* entry;
+    char bid[VALUE] = {0};
     char aux_buff[DEFAULT] = {0};
 
     if(sscanf(buffer, "%*s %d", &_aid) != 1) {
-        printf("Error reading the _aid from buffer.\n");
+        print("Error reading the _aid from buffer.\n");
         return ERR;
     }
     if(_aid < 1 || _aid > 999) {
-        printf("Wrong format for the 'aid' given in SRC.\n");
+        print("Wrong format for the 'aid' given in SRC.\n");
         return ERR;
     }
     
@@ -587,24 +598,23 @@ int show_record(const char* buffer, char* answer) {
     }
 
     strcat(answer, "RRC OK ");
-
     // AUCTIONS/(aid)/START_(aid).txt
     char start_filepath[AUCTION_START_LENGTH] = {0};
     sprintf(start_filepath, "%s%03d/START_%03d.txt", AUCTIONS_DIR, auct.auction_id, auct.auction_id);
     
     // Start file information
     if((file = fopen(start_filepath, "r")) == NULL){
-        printf("Error opening the %s file in SRC.\n", start_filepath);
+        print("Error opening the %s file in SRC.\n", start_filepath);
         return ERR;
     }
 
     if(fgets(aux_buff, DEFAULT, file) == NULL){
-        printf("Error reading from the %s file.\n", start_filepath);
+        print("Error reading from the %s file.\n", start_filepath);
         return ERR;
     }
 
     if(fclose(file) != 0){
-        printf("Error closing the %s file.\n", start_filepath);
+        print("Error closing the %s file.\n", start_filepath);
         return ERR;
     }
 
@@ -617,7 +627,7 @@ int show_record(const char* buffer, char* answer) {
 
     // Getting all Bids
     if ((dir = opendir(bids_dir)) == NULL) {
-        printf("Error opening directory");
+        print("Error opening directory");
         return ERR;
     }
     rewinddir(dir);                                         // Reset the directory stream
@@ -625,19 +635,24 @@ int show_record(const char* buffer, char* answer) {
     while ((entry = readdir(dir)) != NULL){
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
+
         memset(aux_buff, 0, strlen(aux_buff));
         memset(bid_file, 0, strlen(bid_file));
-        sprintf(bid_file, "%s/%s", bids_dir, entry->d_name);
+        memset(bid, 0, strlen(bid));
+
+        strncpy(bid, entry->d_name, VALUE - 1);
+        sprintf(bid_file, "%s/%s", bids_dir, bid);
+        
         if((file = fopen(bid_file, "r")) == NULL){
-            printf("Error opening the %s file in SRC.\n", bid_file);
+            print("Error opening the %s file in SRC.\n", bid_file);
             return ERR;
         }
         if(fgets(aux_buff, DEFAULT, file) == NULL){
-            printf("Error reading from the %s file.\n", entry->d_name);
+            print("Error reading from the %s file.\n", entry->d_name);
             return ERR;
         }
         if(fclose(file) != 0){
-            printf("Error closing the %s file.\n", entry->d_name);
+            print("Error closing the %s file.\n", entry->d_name);
             return ERR;
         }
         strcat(answer, "\nB ");
@@ -658,15 +673,15 @@ int show_record(const char* buffer, char* answer) {
 
     // End file information
     if((file = fopen(end_filepath, "r")) == NULL){
-        printf("Error opening the %s file in SRC.\n", end_filepath);
+        print("Error opening the %s file in SRC.\n", end_filepath);
         return ERR;
     }
     if(fgets(aux_buff, DEFAULT, file) == NULL){
-        printf("Error reading from the %s file.\n", end_filepath);
+        print("Error reading from the %s file.\n", end_filepath);
         return ERR;
     }
     if(fclose(file) != 0){
-        printf("Error closing the %s file.\n", end_filepath);
+        print("Error closing the %s file.\n", end_filepath);
         return ERR;
     }
 
@@ -740,17 +755,17 @@ int create_auction(char* user_uid, char* name, char* start_value, char* time_act
 
     if(mkdir(auction_dir, 0777) != 0){
         if (errno == EEXIST) {
-            printf("Directory '%s' already exists.\n", auction_dir);
+            print("Directory '%s' already exists.\n", auction_dir);
         }
-        printf("Error creating the auction directory.\n");
+        print("Error creating the auction directory.\n");
         return ERR;
     }
     if(mkdir(asset_dir, 0777) != 0){
-        printf("Error creating the asset directory.\n");
+        print("Error creating the asset directory.\n");
         return ERR;
     }
     if(mkdir(bids_dir, 0777) != 0){
-        printf("Error creating the bids directory.\n");
+        print("Error creating the bids directory.\n");
         return ERR;
     }
 
@@ -768,41 +783,41 @@ int create_auction(char* user_uid, char* name, char* start_value, char* time_act
     get_time(&fulltime, curr_time);
     sprintf(start_data, "%s %s %s %s %s %s %ld", user_uid, name, asset_name, start_value, time_active, curr_time, fulltime);
     if((file = fopen(auction_start_filepath, "w")) == NULL){
-        printf("Error creating start.txt file.\n");
+        print("Error creating start.txt file.\n");
         return ERR;
     }
     if(fprintf(file, "%s", start_data) != strlen(start_data)){
-        printf("Error writing in start.txt file.\n");
+        print("Error writing in start.txt file.\n");
         return ERR;
     }
     if(fclose(file) != 0){
-        printf("Error writing in start.txt file.\n");
+        print("Error writing in start.txt file.\n");
         return ERR;
     }
 
     // Adding the auction to the user hosted directory
     sprintf(user_hosted_auction, "%s%s/HOSTED/%03d.txt", USERS_DIR, user_uid, aid);
     if((file = fopen(user_hosted_auction, "w")) == NULL){
-        printf("Error creating hosted auction file in USERS.\n");
+        print("Error creating hosted auction file in USERS.\n");
         return ERR;
     }
     if(fclose(file) != 0){
-        printf("Error closing user hosted file.\n");
+        print("Error closing user hosted file.\n");
         return ERR;
     }
 
     // Creating the asset file
     sprintf(auction_asset_filepath, "%s/%s", asset_dir, asset_name);
     if((file = fopen(auction_asset_filepath, "w")) == NULL){
-        printf("Error creating asset file .\n");
+        print("Error creating asset file .\n");
         return ERR;
     }
     if((fprintf(file, "%s", asset_data)) != strlen(asset_data)){
-        printf("Error writing to the asset file.\n");
+        print("Error writing to the asset file.\n");
         return ERR;
     }
     if(fclose(file) != 0){
-        printf("Error closing asset file.\n");
+        print("Error closing asset file.\n");
         return ERR;
     }
 
@@ -824,22 +839,22 @@ int create_bid(const char* user_uid, int _aid, int value){
     sprintf(bid_buffer, "%s %d %s %ld", user_uid, value, curr_time, fulltime);
 
     if((file = fopen(bid_filepath, "w")) == NULL){
-        printf("Error creating file %s.\n", bid_filepath);
+        print("Error creating file %s.\n", bid_filepath);
         return ERR;
     }
 
     if(fprintf(file, "%s", bid_buffer) != strlen(bid_buffer)){
-        printf("Error writing to the bid file.\n");
+        print("Error writing to the bid file.\n");
         return ERR;
     }
 
     if(fclose(file) != 0){
-        printf("Error closing file %s.\n", bid_filepath);
+        print("Error closing file %s.\n", bid_filepath);
         return ERR;
     }
 
     if(create_file(user_bid_filepath) != STATUS_OK) return ERR;
-    printf("Ending create_bid.\n");
+    print("Ending create_bid.\n");
     return STATUS_OK;
 }
 
@@ -854,35 +869,35 @@ int bid(const char* buffer) {
     char login_filepath[MAX_FILE_LENGTH] = {0};
     char hosted_filepath[USER_HOSTED_AUCTION_LENGTH] = {0};
 
-    printf("buffer to bid: |%s|\n", buffer);
+    print("buffer to bid: |%s|\n", buffer);
     if(sscanf(buffer, "%s %s %d\n", user_uid, password, &_aid) != 3){
-        printf("Wrong format sent to bid() function.\n");
+        print("Wrong format sent to bid() function.\n");
         return ERR;
     }
     if(read_next_word(str_value, VALUE) == ERR){
-        printf("Error reading the value to bid.\n");
+        print("Error reading the value to bid.\n");
         return ERR;
     }
     value = atoi(str_value);
 
     if(valid_uid(user_uid) != STATUS_OK){
-        printf("Wrong format user_uid in bid() function.\n");
+        print("Wrong format user_uid in bid() function.\n");
         return ERR;
     }
     if(valid_pass(password) != STATUS_OK){
-        printf("Wrong format password in bid() function.\n");
+        print("Wrong format password in bid() function.\n");
         return ERR;
     }
     if(_aid < 1 || _aid > 999){
-        printf("Wrong format _aid in bid() function.\n");
+        print("Wrong format _aid in bid() function.\n");
         return ERR;
     }
     if( value < 1 || value > 999999){
-        printf("Wrong format value in bid() function.\n");
+        print("Wrong format value in bid() function.\n");
         return ERR;
     }
 
-    printf("Getting auction.\n");
+    print("Getting auction.\n");
     Auction auct;
     get_auction(_aid, &auct);
 
@@ -915,48 +930,48 @@ int open_auction(const char* buffer, char* answer){
     int check_pass_result, result;
 
     if(sscanf(buffer, "%s %s ", user_uid, password) != 2){
-        printf("Wrong format sent to open().\n");
+        print("Wrong format sent to open().\n");
         return ERR;
     }
 
     if(valid_uid(user_uid) == ERR){
-        printf("Wrong format in user_uid on open().\n");
+        print("Wrong format in user_uid on open().\n");
         return ERR;
     }
     if(valid_pass(password) == ERR){
-        printf("Wrong format in password on open().\n");
+        print("Wrong format in password on open().\n");
         return ERR;
     }
 
     if(read_next_word(name, AUCT_NAME) != STATUS_OK){
-        printf("Error reading the name in open().\n");
+        print("Error reading the name in open().\n");
         return ERR;
     }
     if(read_next_word(start_value, VALUE) != STATUS_OK){
-        printf("Error on start_value in open().\n");
+        print("Error on start_value in open().\n");
         return ERR;
     }
     if(read_next_word(time_active, TIME_ACTIVE) != STATUS_OK){
-        printf("Error on time_active in open().\n");
+        print("Error on time_active in open().\n");
         return ERR;
     }
     if(read_next_word(asset_name, ASSET_NAME) != STATUS_OK){
-        printf("Error on asset_name in open().\n");
+        print("Error on asset_name in open().\n");
         return ERR;
     }
     if(read_next_word(file_size_str, 5) != STATUS_OK){
-        printf("Error reading the file_size in open().\n");
+        print("Error reading the file_size in open().\n");
         return ERR;
     }
 
     if((file_size = atoi(file_size_str)) == 0){
-        printf("A non valid integer read in file_size_str.\n");
+        print("A non valid integer read in file_size_str.\n");
         return ERR;
     }
     file_size++;            // '\0'
     char *asset_data = (char *)malloc(file_size * sizeof(char)); 
     if(tcp_read(asset_data, file_size) == ERR){
-        printf("Wrong format sent to open().\n");
+        print("Wrong format sent to open().\n");
         free(asset_data);
         return ERR;
     }
@@ -964,7 +979,7 @@ int open_auction(const char* buffer, char* answer){
 
     if(valid_pass(password) == ERR || valid_uid(user_uid) == ERR || is_numeric(start_value) == ERR
         || is_numeric(time_active) == ERR){
-        printf("Wrong format sent to open().\n");
+        print("Wrong format sent to open().\n");
         free(asset_data);
         return ERR;
     }
@@ -998,19 +1013,19 @@ int close_auction(const char* buffer){
     int _aid;
 
     if(sscanf(buffer, "%s %s %d\n", user_uid, password, &_aid) != 3){
-        printf("Wrong format sent to close().\n");
+        print("Wrong format sent to close().\n");
         return ERR;
     }
     if(valid_uid(user_uid) != STATUS_OK){
-        printf("Wrong format user_uid in close().\n");
+        print("Wrong format user_uid in close().\n");
         return ERR;
     }
     if(valid_pass(password) != STATUS_OK){
-        printf("Wrong format password in close().\n");
+        print("Wrong format password in close().\n");
         return ERR;
     }
     if(_aid < 1 || _aid > 999){
-        printf("Wrong format: AID in close().\n");
+        print("Wrong format: AID in close().\n");
         return ERR;
     }
 
@@ -1052,23 +1067,20 @@ int show_asset(const char* buffer, char* answer){
     FILE* file;
 
     if(sscanf(buffer, "%d", &_aid) != 1) return STATUS_NOK;
-    printf("ola\n");
+    if(_aid < 1 || _aid > 999) return STATUS_NOK;
+
     sprintf(start_filepath, "%s%03d/START_%03d.txt", AUCTIONS_DIR, _aid, _aid);
-    printf("ola\n");
     if((file = fopen(start_filepath, "r")) == NULL) return STATUS_NOK;
     if(fscanf(file, "%*s %*s %s", asset_name) != 1) return STATUS_NOK;
     if(fclose(file) != 0) return STATUS_NOK;
-    printf("ola\n");
-    fsize = CheckAssetFile(asset_filepath);
-    printf("ola\n");
     sprintf(asset_filepath, "%s%03d/ASSET/%s", AUCTIONS_DIR, _aid, asset_name);
-    
+    fsize = CheckAssetFile(asset_filepath);
     if((file = fopen(asset_filepath, "r")) == NULL) return STATUS_NOK;
-    printf("ola\n");
-    while(fread(asset_data, fsize, sizeof(char), file) > 0);
-    printf("ola\n");
+    fread(asset_data, fsize, sizeof(char), file);
     if(fclose(file) != 0) return STATUS_NOK;
-    printf("ola\n");
+    print("|%s|, %d\n",asset_data, fsize);
+    sprintf(answer, "RSA OK %s %d ", asset_name, fsize);
+    if(tcp_write(answer, strlen(answer)) != STATUS_OK) return STATUS_NOK;
     if(tcp_write(asset_data, fsize) != STATUS_OK) return STATUS_NOK;
     return STATUS_OK;
 }
@@ -1080,7 +1092,7 @@ int max(int a, int b){
 
 void udp_handler(){
     char buffer[MAX_MSG_LEN] = {0};
-    char message_code[CODE_SIZE + 1] = {0};
+    char message_code[CODE_SIZE+1] = {0};
     char answer[MAX_MSG_LEN] = {0};
     udp_addrlen = sizeof(udp_addr);
     udp_n = recvfrom(udp_fd, buffer, MAX_MSG_LEN, 0, (struct sockaddr *)&udp_addr, &udp_addrlen);
@@ -1088,9 +1100,6 @@ void udp_handler(){
     if (udp_n == -1)
         exit(1);
     memcpy(message_code, buffer, CODE_SIZE);
-    write(1, "received: ", 10);
-    write(1, buffer, udp_n);
-
     if(strcmp(message_code, "LIN ") == 0){
         if(udp_n != LIN_SIZE)
             strcpy(answer, "RLI ERR");
@@ -1194,7 +1203,7 @@ void udp_handler(){
         }
     }
 
-    else if(strcmp(message_code, "LST ") == 0){
+    else if(strcmp(message_code, "LST\n") == 0){
         if(udp_n != LST_SIZE)
             strcpy(answer, "RLS ERR");
         else {
@@ -1227,10 +1236,8 @@ void udp_handler(){
             }
         }
     }
-    
-    else {
-        strcpy(answer, "ERR Wrong Format.\n");
-    }
+
+    else strcpy(answer, "Error wrong Format.\n");
 
     udp_n = sendto(udp_fd, answer, strlen(answer), 0,(struct sockaddr *)&udp_addr, udp_addrlen);
         if (udp_n == -1) /*error*/
@@ -1245,7 +1252,6 @@ void tcp_handler(int tcp_newfd){
     if((tcp_read(message_code, CODE_SIZE)) == ERR)
         exit(1);
 
-    printf("Code received: |%s|\n", message_code);
     if(strcmp(message_code, "OPA ") == 0){
         if(tcp_read(buffer, OPEN_SIZE) == ERR)
             exit(1);
@@ -1295,7 +1301,7 @@ void tcp_handler(int tcp_newfd){
             exit(1);
         switch (show_asset(buffer, answer)) {
             case STATUS_OK:
-                break;
+                return;
             default:
                 sprintf(answer, "RSA ERR");
                 break;
@@ -1330,7 +1336,7 @@ void tcp_handler(int tcp_newfd){
     }
     
     if(tcp_write(answer, strlen(answer)) == ERR){
-        printf("Error sending client message TCP.\n");    
+        print("Error sending client message TCP.\n");    
         exit(1);
     }
 
@@ -1338,7 +1344,26 @@ void tcp_handler(int tcp_newfd){
     return;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    char port[PORT_SIZE] = {0};
+    switch (argc){
+        case 2:
+            if(strcmp(argv[1], "-v") == 0) {
+                v = 1;
+                strcat(port, PORT);
+            }
+            else strcat(port, argv[1]);
+            break;
+        case 3:
+            v = 1;
+            strcat(port, argv[1]);
+            break;
+        default:
+            v = 1;          // REMOVE ! #
+            strcat(port, PORT);
+            break;
+    }
+
     // UDP setup
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd == -1)
@@ -1349,7 +1374,7 @@ int main() {
     udp_hints.ai_socktype = SOCK_DGRAM;
     udp_hints.ai_flags = AI_PASSIVE;
 
-    if ((udp_errcode = getaddrinfo(NULL, PORT, &udp_hints, &udp_res)) != 0)
+    if ((udp_errcode = getaddrinfo(NULL, port, &udp_hints, &udp_res)) != 0)
         exit(1);
 
     if ((udp_n = bind(udp_fd, udp_res->ai_addr, udp_res->ai_addrlen)) == -1)
@@ -1364,7 +1389,7 @@ int main() {
     tcp_hints.ai_socktype = SOCK_STREAM;
     tcp_hints.ai_flags = AI_PASSIVE;
 
-    if ((tcp_errcode = getaddrinfo(NULL, PORT, &tcp_hints, &tcp_res)) != 0)
+    if ((tcp_errcode = getaddrinfo(NULL, port, &tcp_hints, &tcp_res)) != 0)
         exit(1);
 
     if ((tcp_n = bind(tcp_fd, tcp_res->ai_addr, tcp_res->ai_addrlen)) == -1)
@@ -1381,8 +1406,14 @@ int main() {
         FD_SET(tcp_fd, &read_fds);
         FD_SET(udp_fd, &read_fds);
         int max_fd = max(udp_fd, tcp_fd);
-        if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1)
+
+        if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1){
+            freeaddrinfo(udp_res);
+            close(udp_fd);
+            freeaddrinfo(tcp_res);    
+            close(tcp_fd);
             exit(1);
+        }
 
         // Handle UDP activity
         if (FD_ISSET(udp_fd, &read_fds))
@@ -1391,10 +1422,20 @@ int main() {
         // Handle TCP activity
         if (FD_ISSET(tcp_fd, &read_fds)){
             tcp_addrlen = sizeof(tcp_addr);
-            if((tcp_newfd = accept(tcp_fd, (struct sockaddr*)&tcp_addr, &tcp_addrlen)) == -1)
+            if((tcp_newfd = accept(tcp_fd, (struct sockaddr*)&tcp_addr, &tcp_addrlen)) == -1){
                 exit(1);
-            if((child_pid = fork()) == -1)
+                freeaddrinfo(udp_res);
+                close(udp_fd);
+                freeaddrinfo(tcp_res);    
+                close(tcp_fd);
+            }
+            if((child_pid = fork()) == -1){
+                freeaddrinfo(udp_res);
+                close(udp_fd);
+                freeaddrinfo(tcp_res);    
+                close(tcp_fd);
                 exit(1);
+            }
             if(child_pid == 0)
                 tcp_handler(tcp_newfd);
         }
