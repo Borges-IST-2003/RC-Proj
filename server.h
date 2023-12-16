@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <stdarg.h>
+#include <pthread.h>
 
 //"USERS/103074/BIDDED/001.txt"
 //"AUCTIONS/001/bids/100000"
@@ -26,7 +27,7 @@
 
 #define DEFAULT 128
 
-// Filepaths -> LENGTH & directories -> SIZE (convention used)
+// Filepaths -> LENGTH | directories -> SIZE (convention used)
 #define USER_DIR_SIZE 13
 
 #define USER_SUB_DIR_LENGTH 20
@@ -55,6 +56,7 @@
 #define AID 4
 #define CURR_TIME 20
 #define FULLTIME 5
+#define MAX_BIDS 50
 
 
 // Possible Returns from functions
@@ -112,6 +114,7 @@ struct addrinfo tcp_hints, udp_hints, *udp_res, *tcp_res;
 struct sockaddr_in udp_addr, tcp_addr;
 pid_t child_pid;
 int aid, v = 0;
+pthread_mutex_t aid_lock;
 
 typedef struct auction{
     int auction_id;
