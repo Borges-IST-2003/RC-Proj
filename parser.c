@@ -1,18 +1,4 @@
-#include <stdio.h>
-#include <string.h>
-
-#define LOGIN 1
-#define LOGOUT 2
-#define UNREGISTER 3
-#define EXIT 4
-#define OPEN 5
-#define CLOSE 6
-#define MYAUCTIONS 7
-#define MYBIDS 8
-#define LIST 9
-#define SHOW_ASSET 10
-#define BID 11
-#define SHOW_RECORD 12
+#include "parser.h"
 
 int isalphanum(char *str){
     return strspn(str, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890") == strlen(str);
@@ -26,6 +12,24 @@ int isnum(char *str){
     return strspn(str, "123456780") == strlen(str);
 }
 
+//reads word and returns word length and last read character
+int read_word(char *word, char *c) {
+	int i = 0;
+
+    memset(word, 0, strlen(word));
+
+	while (1) {
+        read(STDIN_FILENO, word + i, 1);
+		*c = word[i];
+		if (*c == '\n' || *c == ' ') {
+            word[i] = '\0';
+			break;
+		}
+		i++;
+	}
+    return strlen(word);
+}
+
 //return 0 if user not logged in and 1 if is logged in
 int login_check(char *uid){
     if (uid[0] == '\0')
@@ -35,26 +39,28 @@ int login_check(char *uid){
 
 /*le uid do stdin e verifica se estifer corretamente formatado
     o uid novo fica guardado na variavel passada a funcao*/
-int parse_uid(char *uid){
-    scanf("%s", uid);
+int parse_uid(char *uid, char *c){
 
-    if (strlen(uid) != 6){
+    if (read_word(uid, c) != 6){
+        memset(uid, 0, strlen(uid));
         printf("Comprimento errado UID!\n");
         return -1;
     }
     if (!isnum(uid)){
+        memset(uid, 0, strlen(uid));
+        printf("UID invalido!\n");
         return -1;
-        printf("Formatação errada UID!\n");
     }
+
     return 0;
 }
 
 /*le password do stdin e verifica se estifer corretamente formatada
     a password fica guardada na variavel passada a funcao*/
-int parse_password(char *password){
-    scanf("%s", password);
+int parse_password(char *password, char *c){
 
-    if (strlen(password) != 8){
+    if (read_word(password, c) != 8){
+        memset(password, 0, strlen(password));
         printf("Comprimento errado password!\n");
         return -1;
     }
@@ -63,16 +69,16 @@ int parse_password(char *password){
 }
 
 /*valida os dados de login e escreve toda a mensagem a ser enviada para o AS*/
-int parse_login(char *message, char *uid, char *password){
+int parse_login(char *message, char *uid, char *password, char *c){
     if (login_check(uid) == 1){
         printf("User still logged in. Logout first!\n");
         return -1;
     }
-    if (parse_uid(uid) == -1 || parse_password(password) == -1){
+    if (parse_uid(uid, c) == -1 || *c != ' ' || parse_password(password, c) == -1  || *c != '\n'){
         printf("Falha Login!\n");
-        memset(message, 0, strlen(message));
         memset(uid, 0, strlen(uid));
         memset(password, 0, strlen(password));
+        memset(message, 0, strlen(message));
         return -1;
     }
 
@@ -111,7 +117,7 @@ int parse_unregister(char *message, char *uid, char *password){
 
 /*valida todos os parametros dados pelo utilizador, escreve parte da mensagem
     a ser enviada para o AS, ate ao Fname + ' '     */
-int parse_open(char *message, char *uid, char *password){
+int parse_open(char *message, char *uid, char *password, char *c){
     char name[11] = {0};
     char fname[25] = {0};
     char start_value[7] = {0};
@@ -127,22 +133,22 @@ int parse_open(char *message, char *uid, char *password){
     strcat(message, password);
     strcat(message, " \0");
 
-    if (scanf("%s", name) == -1 || strlen(name) > 10 || !isalphanum(name)){
+    if (read_word(name, c) > 10 || !isalphanum(name) || *c != ' '){
         memset(message, 0, strlen(message));
         printf("Name error\n");
         return -1;
     }
-    if (scanf("%s", fname) == -1 || strlen(fname) > 24 || !isalphanum_plus(fname)){
+    if (read_word(fname, c) > 24 || !isalphanum_plus(fname) || *c != ' '){
         memset(message, 0, strlen(message));
         printf("Fname error\n");
         return -1;
     }
-    if (scanf("%s", start_value) == -1 || strlen(start_value) > 6 || !isnum(start_value)){
+    if (read_word(start_value, c) > 6 || !isnum(start_value) || *c != ' '){
         memset(message, 0, strlen(message));
         printf("Start Value error\n");
         return -1;
     }
-    if (scanf("%s", time_active) == -1 || 0 >= strlen(time_active) > 5 || !isnum(time_active)){
+    if (read_word(time_active, c) > 5 || !isnum(time_active) || *c != '\n'){
         memset(message, 0, strlen(message));
         printf("Time actie error\n");
         return -1;
@@ -161,7 +167,7 @@ int parse_open(char *message, char *uid, char *password){
 }
 
 /*Valida os parametros de input e escreve toda a mesnagem a ser enviada ao AS*/
-int parse_close(char *message, char *uid, char *password){
+int parse_close(char *message, char *uid, char *password, char *c){
     char aid[4] = {0};
     if (login_check(uid) == 0){
         printf("User not logged in\n");
@@ -173,7 +179,7 @@ int parse_close(char *message, char *uid, char *password){
     strcat(message, password);
     strcat(message, " \0");
 
-    if (scanf("%s", aid) == -1 || strlen(aid) != 3 || !isnum(aid)){
+    if (read_word(aid, c) != 3 || !isnum(aid) || *c != '\n'){
         memset(message, 0, strlen(message));
         printf("Invalid AID\n");
         return -1;
@@ -209,9 +215,9 @@ int parse_mybids(char *message, char *uid){
 }
 
 /*Valida o parametro de input e escreve toda a mensagem a ser enviada ao AS*/
-int parse_show_asset(char *message){
+int parse_show_asset(char *message, char *c){
     char aid[4] = {0};
-    if (scanf("%s", aid) == -1 || strlen(aid) != 3 || !isnum(aid)){
+    if (read_word(aid, c) != 3 || !isnum(aid) || *c != '\n'){
         memset(message, 0, strlen(message));
         printf("Invalid AID\n");
         return -1;
@@ -220,7 +226,8 @@ int parse_show_asset(char *message){
     return 0;
 }
 
-int parse_bid(char *message, char *uid, char *password){
+/*Valida o parametro de input e escreve toda a mensagem a ser enviada ao AS*/
+int parse_bid(char *message, char *uid, char *password, char *c){
     char aid[4] = {0};
     char value[7] = {0};
 
@@ -234,7 +241,7 @@ int parse_bid(char *message, char *uid, char *password){
     strcat(message, password);
     strcat(message, " \0");
 
-    if (scanf("%s", aid) == -1 || strlen(aid) != 3 || !isnum(aid)){
+    if (read_word(aid, c) != 3 || !isnum(aid) || *c != ' '){
         memset(message, 0, strlen(message));
         printf("Invalid AID\n");
         return -1;
@@ -242,7 +249,7 @@ int parse_bid(char *message, char *uid, char *password){
     strcat(message, aid);
     strcat(message, " \0");
 
-    if (scanf("%s", value) == -1 || strlen(value) > 5 || !isnum(value)){
+    if (read_word(value, c) > 5 || !isnum(value) || *c != '\n'){
         memset(message, 0, strlen(message));
         printf("Invalid value\n");
         return -1;
@@ -252,9 +259,9 @@ int parse_bid(char *message, char *uid, char *password){
     return 0;
 }
 
-int parse_show_record(char *message){
+int parse_show_record(char *message, char *c){
     char aid[4] = {0};
-    if (scanf("%s", aid) == -1 || strlen(aid) != 3 || !isnum(aid)){
+    if (read_word(aid, c) != 3 || !isnum(aid) || *c != '\n'){
         memset(message, 0, strlen(message));
         printf("Invalid AID\n");
         return -1;
@@ -303,31 +310,35 @@ int parse_action(char *action, char *message, char *uid, char *password){
     }return -1;
 }
 
-int parser(char *message, char *uid, char *password){
+int parser(char *message, char *uid, char *password, char *c){
     char action_in[20] = {0};
+    char trash[10];
     int action;
     
-    scanf("%s", action_in);
+    read_word(action_in, c);
     if ((action = parse_action(action_in, message, uid, password)) == -1){
+        if(*c != '\n')
+            scanf("%s[^\n]", trash);
+
         printf("Ação inválida\n");
         return -1;
     }
     
     switch (action){
         case LOGIN:
-            if (parse_login(message, uid, password) == -1){
+            if (*c == '\n' || parse_login(message, uid, password, c) == -1){
                 printf("Login error\n");
                 return -1;
             }
             break;
         case LOGOUT:
-            if (parse_logout(message, uid, password) == -1){
+            if (*c != '\n' || parse_logout(message, uid, password) == -1){
                 printf("Logout error\n");
                 return -1;
             }
             break;
         case UNREGISTER:
-            if (parse_unregister(message, uid, password) == -1){
+            if (*c != '\n' || parse_unregister(message, uid, password) == -1){
                 printf("Unregister error\n");
                 return -1;
             }
@@ -335,25 +346,25 @@ int parser(char *message, char *uid, char *password){
         case EXIT:
             break;
         case OPEN:
-            if (parse_open(message, uid, password) == -1){
+            if (*c != ' ' || parse_open(message, uid, password, c) == -1){
                 printf("Opening error\n");
                 return -1;
             }
             break;
         case CLOSE:
-            if (parse_close(message, uid, password) == -1){
+            if (*c != ' ' || parse_close(message, uid, password, c) == -1){
                 printf("Closing error\n");
                 return -1;
             }
             break;
         case MYAUCTIONS:
-            if (parse_myauctions(message, uid) == -1){
+            if (*c != '\n' || parse_myauctions(message, uid) == -1){
                 printf("Myauctions error\n");
                 return -1;
             }
             break;
         case MYBIDS:
-            if (parse_mybids(message, uid) == -1){
+            if (*c != '\n' || parse_mybids(message, uid) == -1){
                 printf("Mybids error\n");
                 return -1;
             }
@@ -362,19 +373,19 @@ int parser(char *message, char *uid, char *password){
 
             break;
         case SHOW_ASSET:
-            if (parse_show_asset(message) == -1){
+            if (*c != ' ' || parse_show_asset(message, c) == -1){
                 printf("Show_asset error\n");
                 return -1;
             }
             break;
         case BID:
-            if (parse_bid(message, uid, password) == -1){
+            if (*c != ' ' || parse_bid(message, uid, password, c) == -1){
                 printf("Bidding error\n");
                 return -1;
             }
             break;
         case SHOW_RECORD:
-            if (parse_show_record(message) == -1){
+            if (*c != ' ' || parse_show_record(message, c) == -1){
                 printf("Show_record error\n");
                 return -1;
             }
@@ -385,20 +396,26 @@ int parser(char *message, char *uid, char *password){
     }
 }
 
-
+/*
 int main(){
     char message[100] = {0};
     char uid[7] = {0};
     char password[9] = {0};
+    char c;
 
     while(strcmp(message, "EXIT")){
-        if(parser(message, uid, password) == -1){
-            printf("%s\n", message);
-        }else
-            printf("%s\n", message);
+        if(parser(message, uid, password, &c) == -1)
+            printf("Erro!\n");
+        else
+            printf("-%s-\n", message);
         
+        if(c != '\n')
+            scanf("%s[^\n]", message);
+
         memset(message, 0, strlen(message));
+
         //printf("%s--%s\n", uid, password);
     }
     return 0;
 }
+*/
